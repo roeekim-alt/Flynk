@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>FLYNK — The world, one tap away</title>
+<style>html,body{margin:0;padding:0;background:#05070F}#root{min-height:100vh}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+const T = {
+  bg: "#05070F",
+  bg2: "#080D1A",
+  surface: "rgba(13,20,38,0.55)",
+  surfaceSolid: "#0C1426",
+  line: "rgba(140,160,200,0.14)",
+  text: "#EAF0FA",
+  muted: "#8B98B4",
+  faint: "#5A6884",
+  gold: "#F0B454",
+  goldSoft: "rgba(240,180,84,0.16)",
+  green: "#4ADE80",
+  red: "#F87171",
+  radius: 16
+};
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+:root { color-scheme: dark; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body, #root { height: 100%; }
+body { background: ${T.bg}; color: ${T.text}; font-family: Inter, system-ui, -apple-system, sans-serif; font-size: 16px; line-height: 1.5; overflow-x: hidden; }
+.disp { font-family: 'Space Grotesk', Inter, system-ui, sans-serif; letter-spacing: -0.02em; }
+.mono-num { font-variant-numeric: tabular-nums; }
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; touch-action: manipulation; }
+input, select { font: inherit; color: ${T.text}; background: rgba(255,255,255,0.04); border: 1px solid ${T.line}; border-radius: 10px; padding: 12px 14px; width: 100%; outline: none; min-height: 46px; }
+input:focus, select:focus, button:focus-visible { border-color: ${T.gold}; box-shadow: 0 0 0 3px rgba(240,180,84,0.18); }
+button:focus-visible { outline: 2px solid ${T.gold}; outline-offset: 2px; border-radius: 10px; }
+input::placeholder { color: ${T.faint}; }
+select option { background: ${T.surfaceSolid}; }
+label { display:block; font-size: 12.5px; color: ${T.muted}; margin-bottom: 6px; font-weight: 500; }
+.glass { background: ${T.surface}; backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1px solid ${T.line}; border-radius: ${T.radius}px; }
+.card { background: linear-gradient(180deg, rgba(20,30,55,0.55), rgba(12,18,35,0.55)); backdrop-filter: blur(14px); border: 1px solid ${T.line}; border-radius: ${T.radius}px; }
+.btn-primary { background: linear-gradient(135deg, #F5C169, #E09B32); color: #1A1206; font-weight: 700; border-radius: 12px; padding: 14px 22px; min-height: 48px; transition: transform .15s ease, box-shadow .15s ease, opacity .15s; box-shadow: 0 6px 24px rgba(240,180,84,0.28); }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(240,180,84,0.36); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.btn-ghost { border: 1px solid ${T.line}; border-radius: 12px; padding: 12px 18px; min-height: 46px; color: ${T.text}; transition: border-color .15s, background .15s; }
+.btn-ghost:hover { border-color: rgba(240,180,84,0.5); background: rgba(240,180,84,0.06); }
+.chip { border: 1px solid ${T.line}; border-radius: 999px; padding: 8px 14px; font-size: 13.5px; color: ${T.muted}; transition: all .15s; min-height: 38px; }
+.chip.on { border-color: ${T.gold}; color: ${T.gold}; background: ${T.goldSoft}; }
+.chip:hover { border-color: rgba(240,180,84,0.45); }
+.navlink { color: ${T.muted}; font-size: 14.5px; font-weight: 500; padding: 8px 12px; border-radius: 8px; transition: color .15s; }
+.navlink:hover, .navlink.active { color: ${T.text}; }
+.navlink.active { color: ${T.gold}; }
+.globe-label { position: absolute; transform: translate(-50%, -110%); pointer-events: auto; cursor: pointer; white-space: nowrap; background: rgba(8,13,26,0.82); border: 1px solid rgba(240,180,84,0.45); color: ${T.text}; border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 600; backdrop-filter: blur(8px); box-shadow: 0 4px 18px rgba(0,0,0,0.45); transition: opacity .2s; }
+.globe-label b { color: ${T.gold}; font-weight: 700; margin-left: 5px; }
+.globe-tip { position: absolute; transform: translate(-50%, -130%); pointer-events: none; white-space: nowrap; background: rgba(8,13,26,0.92); border: 1px solid ${T.line}; border-radius: 10px; padding: 6px 10px; font-size: 12.5px; }
+.fadeup { animation: fadeup .5s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes fadeup { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.spin { animation: spin 1s linear infinite; display:inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.pulse-dot { animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity:.55 } 50% { opacity:1 } }
+.hide-scroll::-webkit-scrollbar { display:none; } .hide-scroll { scrollbar-width: none; }
+.seg { display:flex; background: rgba(255,255,255,0.04); border:1px solid ${T.line}; border-radius: 11px; padding: 3px; }
+.seg button { flex:1; padding: 9px 12px; border-radius: 8px; font-size: 13.5px; color: ${T.muted}; font-weight: 600; min-height: 40px; }
+.seg button.on { background: ${T.goldSoft}; color: ${T.gold}; }
+.table-row { display:flex; justify-content: space-between; padding: 9px 0; font-size: 14.5px; border-bottom: 1px dashed ${T.line}; }
+.table-row:last-child { border-bottom: none; }
+@media (prefers-reduced-motion: reduce) { .fadeup, .pulse-dot { animation: none !important; } * { transition-duration: .01ms !important; } }
+@media (max-width: 760px) {
+  .desktop-only { display: none !important; }
+}
+@media (min-width: 761px) {
+  .mobile-only { display: none !important; }
+}
+`;
+const deg2rad = (d) => d * Math.PI / 180;
+function haversineKm(a, b) {
+  const R = 6371;
+  const dLat = deg2rad(b.lat - a.lat), dLon = deg2rad(b.lng - a.lng);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(deg2rad(a.lat)) * Math.cos(deg2rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+function hashStr(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = a + 1831565813 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const money = (n) => "$" + Math.round(n).toLocaleString("en-US");
+const pad2 = (n) => String(n).padStart(2, "0");
+function fmtDur(min) {
+  return `${Math.floor(min / 60)}h ${pad2(Math.round(min % 60))}m`;
+}
+function addDays(date, d) {
+  const x = new Date(date);
+  x.setDate(x.getDate() + d);
+  return x;
+}
+function toISODate(d) {
+  return d.toISOString().slice(0, 10);
+}
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = /* @__PURE__ */ new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+}
+function latLngToV3(lat, lng, r) {
+  const phi = deg2rad(90 - lat), theta = deg2rad(lng + 180);
+  return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
+}
+const AIRPORTS = [
+  { iata: "TLV", icao: "LLBG", name: "Ben Gurion Intl", city: "Tel Aviv", country: "Israel", lat: 32.0114, lng: 34.8867, tags: ["beach", "city", "nightlife", "warm", "weekend"] },
+  { iata: "FCO", icao: "LIRF", name: "Leonardo da Vinci\u2013Fiumicino", city: "Rome", country: "Italy", lat: 41.8003, lng: 12.2389, tags: ["city", "luxury", "weekend"] },
+  { iata: "CDG", icao: "LFPG", name: "Charles de Gaulle", city: "Paris", country: "France", lat: 49.0097, lng: 2.5479, tags: ["city", "luxury", "nightlife", "weekend"] },
+  { iata: "LHR", icao: "EGLL", name: "Heathrow", city: "London", country: "United Kingdom", lat: 51.47, lng: -0.4543, tags: ["city", "nightlife", "luxury", "weekend"] },
+  { iata: "ATH", icao: "LGAV", name: "Eleftherios Venizelos", city: "Athens", country: "Greece", lat: 37.9364, lng: 23.9445, tags: ["beach", "city", "warm", "weekend", "nightlife"] },
+  { iata: "BCN", icao: "LEBL", name: "Josep Tarradellas El Prat", city: "Barcelona", country: "Spain", lat: 41.2974, lng: 2.0833, tags: ["beach", "city", "nightlife", "warm", "weekend"] },
+  { iata: "MAD", icao: "LEMD", name: "Adolfo Su\xE1rez Barajas", city: "Madrid", country: "Spain", lat: 40.4983, lng: -3.5676, tags: ["city", "nightlife", "weekend"] },
+  { iata: "LIS", icao: "LPPT", name: "Humberto Delgado", city: "Lisbon", country: "Portugal", lat: 38.7742, lng: -9.1342, tags: ["beach", "city", "warm", "weekend"] },
+  { iata: "AMS", icao: "EHAM", name: "Schiphol", city: "Amsterdam", country: "Netherlands", lat: 52.3105, lng: 4.7683, tags: ["city", "nightlife", "weekend"] },
+  { iata: "FRA", icao: "EDDF", name: "Frankfurt am Main", city: "Frankfurt", country: "Germany", lat: 50.0379, lng: 8.5622, tags: ["city"] },
+  { iata: "MUC", icao: "EDDM", name: "Franz Josef Strauss", city: "Munich", country: "Germany", lat: 48.3538, lng: 11.7861, tags: ["city", "nature", "weekend"] },
+  { iata: "ZRH", icao: "LSZH", name: "Z\xFCrich Airport", city: "Zurich", country: "Switzerland", lat: 47.4581, lng: 8.5555, tags: ["nature", "luxury", "city"] },
+  { iata: "VIE", icao: "LOWW", name: "Vienna Intl", city: "Vienna", country: "Austria", lat: 48.1103, lng: 16.5697, tags: ["city", "luxury", "weekend"] },
+  { iata: "PRG", icao: "LKPR", name: "V\xE1clav Havel", city: "Prague", country: "Czechia", lat: 50.1008, lng: 14.26, tags: ["city", "nightlife", "weekend"] },
+  { iata: "BUD", icao: "LHBP", name: "Ferenc Liszt Intl", city: "Budapest", country: "Hungary", lat: 47.4298, lng: 19.2611, tags: ["city", "nightlife", "weekend"] },
+  { iata: "IST", icao: "LTFM", name: "Istanbul Airport", city: "Istanbul", country: "T\xFCrkiye", lat: 41.2753, lng: 28.7519, tags: ["city", "weekend"] },
+  { iata: "LCA", icao: "LCLK", name: "Larnaca Intl", city: "Larnaca", country: "Cyprus", lat: 34.8751, lng: 33.6249, tags: ["beach", "warm", "weekend"] },
+  { iata: "DXB", icao: "OMDB", name: "Dubai Intl", city: "Dubai", country: "UAE", lat: 25.2532, lng: 55.3657, tags: ["luxury", "beach", "warm", "nightlife", "city"] },
+  { iata: "DOH", icao: "OTHH", name: "Hamad Intl", city: "Doha", country: "Qatar", lat: 25.2731, lng: 51.6081, tags: ["luxury", "warm", "city"] },
+  { iata: "CAI", icao: "HECA", name: "Cairo Intl", city: "Cairo", country: "Egypt", lat: 30.1219, lng: 31.4056, tags: ["city", "warm"] },
+  { iata: "BKK", icao: "VTBS", name: "Suvarnabhumi", city: "Bangkok", country: "Thailand", lat: 13.69, lng: 100.7501, tags: ["beach", "warm", "nightlife", "nature", "city"] },
+  { iata: "SIN", icao: "WSSS", name: "Changi", city: "Singapore", country: "Singapore", lat: 1.3644, lng: 103.9915, tags: ["luxury", "city", "warm"] },
+  { iata: "HND", icao: "RJTT", name: "Haneda", city: "Tokyo", country: "Japan", lat: 35.5494, lng: 139.7798, tags: ["city", "luxury", "nightlife"] },
+  { iata: "HKG", icao: "VHHH", name: "Hong Kong Intl", city: "Hong Kong", country: "Hong Kong", lat: 22.308, lng: 113.9185, tags: ["city", "luxury", "nightlife"] },
+  { iata: "DEL", icao: "VIDP", name: "Indira Gandhi Intl", city: "New Delhi", country: "India", lat: 28.5562, lng: 77.1, tags: ["city"] },
+  { iata: "BOM", icao: "VABB", name: "Chhatrapati Shivaji", city: "Mumbai", country: "India", lat: 19.0896, lng: 72.8656, tags: ["city", "warm"] },
+  { iata: "JNB", icao: "FAOR", name: "O. R. Tambo Intl", city: "Johannesburg", country: "South Africa", lat: -26.1367, lng: 28.2411, tags: ["nature", "city"] },
+  { iata: "CPT", icao: "FACT", name: "Cape Town Intl", city: "Cape Town", country: "South Africa", lat: -33.9715, lng: 18.6021, tags: ["beach", "nature", "warm", "luxury"] },
+  { iata: "LOS", icao: "DNMM", name: "Murtala Muhammed", city: "Lagos", country: "Nigeria", lat: 6.5774, lng: 3.3212, tags: ["city", "warm"] },
+  { iata: "JFK", icao: "KJFK", name: "John F. Kennedy Intl", city: "New York", country: "United States", lat: 40.6413, lng: -73.7781, tags: ["city", "nightlife", "luxury"] },
+  { iata: "MIA", icao: "KMIA", name: "Miami Intl", city: "Miami", country: "United States", lat: 25.7959, lng: -80.287, tags: ["beach", "warm", "nightlife", "luxury"] },
+  { iata: "ORD", icao: "KORD", name: "O'Hare Intl", city: "Chicago", country: "United States", lat: 41.9742, lng: -87.9073, tags: ["city"] },
+  { iata: "LAX", icao: "KLAX", name: "Los Angeles Intl", city: "Los Angeles", country: "United States", lat: 33.9416, lng: -118.4085, tags: ["beach", "city", "warm", "nightlife"] },
+  { iata: "SFO", icao: "KSFO", name: "San Francisco Intl", city: "San Francisco", country: "United States", lat: 37.6213, lng: -122.379, tags: ["city", "nature"] },
+  { iata: "YYZ", icao: "CYYZ", name: "Toronto Pearson", city: "Toronto", country: "Canada", lat: 43.6777, lng: -79.6248, tags: ["city", "nature"] },
+  { iata: "MEX", icao: "MMMX", name: "Benito Ju\xE1rez Intl", city: "Mexico City", country: "Mexico", lat: 19.4363, lng: -99.0721, tags: ["city", "warm"] },
+  { iata: "GRU", icao: "SBGR", name: "S\xE3o Paulo\u2013Guarulhos", city: "S\xE3o Paulo", country: "Brazil", lat: -23.4356, lng: -46.4731, tags: ["city", "nightlife", "warm"] },
+  { iata: "EZE", icao: "SAEZ", name: "Ministro Pistarini", city: "Buenos Aires", country: "Argentina", lat: -34.8222, lng: -58.5358, tags: ["city", "nightlife"] },
+  { iata: "SYD", icao: "YSSY", name: "Kingsford Smith", city: "Sydney", country: "Australia", lat: -33.9399, lng: 151.1753, tags: ["beach", "city", "warm", "nature"] }
+];
+const byIata = Object.fromEntries(AIRPORTS.map((a) => [a.iata, a]));
+const AIRLINES = [
+  { code: "LY", name: "EL AL", color: "#3B82F6" },
+  { code: "AZ", name: "ITA Airways", color: "#1D4ED8" },
+  { code: "LH", name: "Lufthansa", color: "#F59E0B" },
+  { code: "AF", name: "Air France", color: "#EF4444" },
+  { code: "BA", name: "British Airways", color: "#DC2626" },
+  { code: "A3", name: "Aegean", color: "#0EA5E9" },
+  { code: "TK", name: "Turkish Airlines", color: "#E11D48" },
+  { code: "W6", name: "Wizz Air", color: "#C026D3" },
+  { code: "EK", name: "Emirates", color: "#D97706" },
+  { code: "QR", name: "Qatar Airways", color: "#7C3AED" },
+  { code: "DL", name: "Delta", color: "#2563EB" },
+  { code: "UA", name: "United", color: "#3730A3" },
+  { code: "IB", name: "Iberia", color: "#DC2626" },
+  { code: "KL", name: "KLM", color: "#0891B2" },
+  { code: "LX", name: "SWISS", color: "#B91C1C" }
+];
+const AIRCRAFT = ["Airbus A320neo", "Airbus A321LR", "Boeing 737-8", "Boeing 787-9", "Airbus A350-900", "Boeing 777-300ER", "Embraer E195-E2"];
+const LAND = [
+  // North America
+  [[-168, 66], [-155, 71], [-130, 70], [-110, 73], [-90, 72], [-82, 66], [-75, 62], [-58, 50], [-65, 44], [-74, 40], [-76, 35], [-80, 25], [-84, 30], [-91, 29], [-97, 26], [-97, 20], [-92, 15], [-85, 12], [-78, 8], [-95, 17], [-105, 22], [-114, 30], [-120, 34], [-124, 40], [-124, 48], [-135, 58], [-152, 60], [-166, 60]],
+  // South America
+  [[-78, 8], [-72, 11], [-60, 9], [-52, 4], [-50, 0], [-44, -3], [-35, -9], [-39, -15], [-40, -22], [-48, -26], [-53, -34], [-58, -39], [-65, -41], [-63, -47], [-69, -52], [-75, -52], [-73, -45], [-71, -37], [-70, -30], [-70, -18], [-76, -14], [-81, -6], [-80, 0], [-77, 4]],
+  // Greenland
+  [[-43, 60], [-53, 66], [-55, 70], [-50, 75], [-40, 77], [-30, 76], [-22, 74], [-20, 70], [-25, 65], [-38, 61]],
+  // Africa
+  [[-17, 15], [-16, 21], [-10, 27], [-6, 33], [0, 36], [10, 37], [20, 32], [32, 31], [34, 28], [37, 18], [43, 11], [51, 12], [48, 5], [42, -1], [40, -10], [35, -20], [32, -29], [26, -34], [20, -35], [18, -32], [15, -25], [12, -17], [13, -10], [9, -2], [9, 4], [4, 6], [-5, 5], [-8, 4], [-13, 8], [-17, 12]],
+  // Eurasia (coarse)
+  [[-9, 37], [-9, 43], [-2, 44], [-4, 48], [0, 50], [4, 52], [8, 54], [8, 57], [11, 59], [5, 59], [5, 62], [14, 66], [22, 70], [30, 70], [40, 67], [45, 68], [55, 69], [70, 73], [85, 74], [100, 77], [110, 74], [130, 72], [150, 70], [160, 70], [170, 67], [179, 65], [170, 60], [162, 58], [158, 52], [150, 59], [142, 54], [140, 46], [135, 44], [131, 42], [127, 39], [122, 37], [121, 31], [120, 26], [108, 20], [106, 10], [103, 2], [100, 8], [98, 12], [95, 16], [91, 22], [88, 21], [85, 19], [80, 15], [77, 8], [73, 15], [70, 20], [66, 25], [58, 24], [57, 20], [53, 17], [48, 14], [43, 12], [43, 16], [39, 20], [35, 28], [35, 31], [36, 36], [30, 36], [27, 37], [23, 36], [20, 40], [19, 42], [16, 41], [16, 38], [15, 40], [12, 44], [9, 44], [7, 43], [3, 43], [0, 40], [-2, 37], [-5, 36]],
+  // United Kingdom + Ireland blob
+  [[-10, 52], [-6, 55], [-5, 58], [-2, 58], [1, 53], [0, 51], [-5, 50], [-8, 51]],
+  // Scandinavia interior fix: skip (covered coarsely)
+  // Japan
+  [[130, 31], [132, 34], [137, 35], [140, 36], [141, 40], [142, 45], [145, 44], [141, 42], [136, 36], [131, 32]],
+  // Southeast Asia islands (coarse blobs)
+  [[95, 5], [102, 5], [106, -2], [105, -6], [97, 2]],
+  [[109, 1], [117, 7], [119, 1], [116, -3], [110, -2]],
+  [[105, -6], [114, -8], [105, -7]],
+  [[120, 18], [122, 16], [121, 12], [123, 9], [125, 6], [121, 7], [119, 11], [120, 16]],
+  // Madagascar
+  [[44, -12], [50, -16], [47, -25], [44, -20]],
+  // Australia
+  [[114, -22], [114, -34], [118, -35], [124, -33], [130, -32], [136, -35], [140, -38], [147, -38], [150, -37], [153, -31], [153, -25], [146, -19], [142, -11], [136, -12], [131, -12], [126, -14], [122, -18]],
+  // New Zealand
+  [[172, -34], [178, -38], [174, -41], [171, -44], [167, -46], [170, -41]],
+  // Iceland
+  [[-24, 64], [-18, 66], [-14, 65], [-18, 63]],
+  // Cuba / Caribbean hint
+  [[-85, 22], [-78, 21], [-74, 20], [-80, 23]]
+];
+function pointInPoly(lon, lat, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if (yi > lat !== yj > lat && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function isLand(lon, lat) {
+  return LAND.some((p) => pointInPoly(lon, lat, p));
+}
+const DuffelProvider = {
+  id: "duffel",
+  ready: false,
+  // flip when DUFFEL_API_KEY is configured server-side
+  async searchOffers(params) {
+    throw new Error("Duffel credentials not configured \u2014 falling back to mock provider");
+  },
+  async getOffer(id) {
+    throw new Error("Duffel not configured");
+  },
+  async createOrder() {
+    throw new Error("Duffel not configured");
+  }
+};
+const MockProvider = {
+  id: "mock",
+  ready: true,
+  async searchOffers({ origin, destination, date, cabin = "economy", passengers = 1 }) {
+    await wait(650 + Math.random() * 500);
+    const o = byIata[origin], d = byIata[destination];
+    if (!o || !d) return [];
+    const km = haversineKm(o, d);
+    const seed = hashStr(origin + destination + date + cabin);
+    const r = rng(seed);
+    const cabinMult = { economy: 1, premium: 1.7, business: 3.1, first: 5.2 }[cabin] || 1;
+    const n = 7 + Math.floor(r() * 6);
+    const offers = [];
+    for (let i = 0; i < n; i++) {
+      const airline = AIRLINES[Math.floor(r() * AIRLINES.length)];
+      const stops = km > 4500 ? r() < 0.55 ? 1 : r() < 0.5 ? 0 : 2 : r() < 0.72 ? 0 : 1;
+      const cruiseMin = km / (760 + r() * 90) * 60 + 35;
+      const layoverMin = stops === 0 ? 0 : stops * (55 + Math.floor(r() * 170));
+      const durMin = Math.round(cruiseMin + layoverMin);
+      const depH = 5 + Math.floor(r() * 18), depM = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55][Math.floor(r() * 12)];
+      const base = 42 + km * 0.072 * (0.78 + r() * 0.72);
+      const price = Math.round(base * cabinMult * (stops === 0 ? 1.14 : 1) * passengers);
+      const via = stops > 0 ? pickVia(o, d, r) : null;
+      const fareType = r() < 0.4 ? "Basic" : r() < 0.7 ? "Standard" : "Flex";
+      const arr = minutesToClock(depH * 60 + depM + durMin);
+      offers.push({
+        id: `off_${seed.toString(36)}_${i}`,
+        provider: "mock",
+        airline,
+        flightNo: `${airline.code}${100 + Math.floor(r() * 890)}`,
+        origin,
+        destination,
+        date,
+        cabin,
+        passengers,
+        depTime: `${pad2(depH)}:${pad2(depM)}`,
+        arrTime: arr.clock,
+        dayShift: arr.dayShift,
+        durationMin: durMin,
+        stops,
+        via,
+        aircraft: AIRCRAFT[Math.floor(r() * AIRCRAFT.length)],
+        depTerminal: `T${1 + Math.floor(r() * 3)}`,
+        arrTerminal: `T${1 + Math.floor(r() * 3)}`,
+        bagsIncluded: fareType === "Basic" ? "Cabin bag only" : fareType === "Standard" ? "Cabin + 23kg checked" : "Cabin + 2\xD723kg checked",
+        fareType,
+        refundable: fareType === "Flex",
+        changeFee: fareType === "Flex" ? 0 : fareType === "Standard" ? 65 : null,
+        // null = not changeable
+        seatPitch: cabin === "economy" ? `${29 + Math.floor(r() * 3)}"` : cabin === "premium" ? `38"` : `74" lie-flat`,
+        priceBase: Math.round(price * 0.74),
+        taxes: Math.round(price * 0.19),
+        carrierFees: Math.round(price * 0.07),
+        price
+      });
+    }
+    return offers.sort((a, b) => a.price - b.price);
+  },
+  async getOffer(id, cache) {
+    return cache?.find((x) => x.id === id) || null;
+  },
+  async createOrder(offer, passengers, extras, totals) {
+    await wait(900);
+    const r = rng(hashStr(offer.id + Date.now()));
+    const pnr = Array.from({ length: 6 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(r() * 32)]).join("");
+    return { pnr, status: "confirmed", createdAt: (/* @__PURE__ */ new Date()).toISOString(), offer, passengers, extras, totals };
+  }
+};
+function pickVia(o, d, r) {
+  const hubs = ["IST", "FRA", "CDG", "AMS", "VIE", "DXB", "DOH", "LHR", "MUC", "ZRH"].filter((h) => h !== o.iata && h !== d.iata);
+  return hubs[Math.floor(r() * hubs.length)];
+}
+function minutesToClock(totalMin) {
+  const dayShift = Math.floor(totalMin / 1440);
+  const m = totalMin % 1440;
+  return { clock: `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`, dayShift };
+}
+const wait = (ms) => new Promise((res) => setTimeout(res, ms));
+const PROVIDERS = { mock: MockProvider, duffel: DuffelProvider };
+const ACTIVE_PROVIDER = "mock";
+function provider() {
+  const p = PROVIDERS[ACTIVE_PROVIDER];
+  return p.ready ? p : MockProvider;
+}
+const AirportService = {
+  all: () => AIRPORTS,
+  get: (iata) => byIata[iata] || null,
+  search(q) {
+    if (!q) return [];
+    const s = q.trim().toLowerCase();
+    return AIRPORTS.filter(
+      (a) => a.iata.toLowerCase().startsWith(s) || a.city.toLowerCase().includes(s) || a.name.toLowerCase().includes(s) || a.country.toLowerCase().includes(s)
+    ).slice(0, 7);
+  }
+};
+const FlightSearchService = {
+  search: (params) => provider().searchOffers(params),
+  async explore({ origin, maxBudget, maxDurationH, directOnly, tags }) {
+    await wait(300);
+    const o = byIata[origin];
+    if (!o) return [];
+    const list = AIRPORTS.filter((a) => a.iata !== origin).map((a) => {
+      const km = haversineKm(o, a);
+      const r = rng(hashStr(origin + a.iata + "explore"));
+      const price = Math.round(38 + km * 0.062 * (0.75 + r() * 0.5));
+      const durH = km / 790 + 0.7;
+      const direct = km < 4200 || r() < 0.4;
+      return { airport: a, price, durH, direct, km };
+    }).filter((x) => {
+      if (maxBudget && x.price > maxBudget) return false;
+      if (maxDurationH && x.durH > maxDurationH) return false;
+      if (directOnly && !x.direct) return false;
+      if (tags?.length && !tags.every((t) => x.airport.tags.includes(t))) return false;
+      return true;
+    });
+    return list.sort((a, b) => a.price - b.price);
+  }
+};
+const OfferService = { get: (id, cache) => provider().getOffer(id, cache) };
+const BookingService = {
+  _orders: [],
+  async create(offer, passengers, extras, totals) {
+    const order = await provider().createOrder(offer, passengers, extras, totals);
+    this._orders.unshift(order);
+    return order;
+  },
+  list() {
+    return this._orders;
+  }
+};
+const PaymentService = {
+  // Structured for Stripe: create PaymentIntent server-side, confirm with
+  // stripe.confirmCardPayment(clientSecret, { payment_method: {...} })
+  async pay({ method, amount }) {
+    await wait(1300);
+    return { ok: true, txId: "pi_mock_" + Math.random().toString(36).slice(2, 10), method, amount };
+  }
+};
+const EXTRAS_CATALOG = [
+  { id: "bag23", label: "Checked bag \xB7 23kg", desc: "One checked bag up to 23kg", price: 34 },
+  { id: "bag32", label: "Extra bag \xB7 32kg", desc: "Second heavy bag up to 32kg", price: 58 },
+  { id: "seat", label: "Seat selection", desc: "Pick your exact seat on every leg", price: 14 },
+  { id: "priority", label: "Priority boarding", desc: "Board first with two cabin bags", price: 12 },
+  { id: "flex", label: "Flexible ticket", desc: "Change dates once with no change fee", price: 42 },
+  { id: "insurance", label: "Travel insurance", desc: "Medical + cancellation cover", price: 26 }
+];
+const SERVICE_FEE = 9;
+function makeGlowTexture(inner = "#FFE9C4", outer = "rgba(240,180,84,0)") {
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d");
+  const grad = g.createRadialGradient(32, 32, 2, 32, 32, 30);
+  grad.addColorStop(0, inner);
+  grad.addColorStop(0.35, "rgba(240,180,84,0.9)");
+  grad.addColorStop(1, outer);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  return tex;
+}
+function Globe({ originIata, destIata, highlights, onPickAirport, className, style }) {
+  const wrapRef = useRef(null);
+  const labelWrapRef = useRef(null);
+  const stateRef = useRef({});
+  const cbRef = useRef(onPickAirport);
+  cbRef.current = onPickAirport;
+  const hlRef = useRef(highlights);
+  hlRef.current = highlights;
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const S = stateRef.current;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    wrap.appendChild(renderer.domElement);
+    renderer.domElement.style.cssText = "position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab;";
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+    camera.position.set(0, 0, 3.1);
+    const world = new THREE.Group();
+    world.rotation.y = -Math.PI / 5;
+    world.rotation.x = 0.25;
+    scene.add(world);
+    const ocean = new THREE.Mesh(
+      new THREE.SphereGeometry(0.985, 64, 64),
+      new THREE.MeshPhongMaterial({ color: 660006, emissive: 396056, shininess: 18, transparent: true, opacity: 0.96 })
+    );
+    world.add(ocean);
+    const dots = [];
+    for (let lat = -60; lat <= 78; lat += 1.6) {
+      const step = 1.6 / Math.max(Math.cos(deg2rad(lat)), 0.25);
+      for (let lon = -180; lon < 180; lon += step) {
+        if (isLand(lon, lat)) {
+          const v = latLngToV3(lat, lon, 1);
+          dots.push(v.x, v.y, v.z);
+        }
+      }
+    }
+    const dotGeo = new THREE.BufferGeometry();
+    dotGeo.setAttribute("position", new THREE.Float32BufferAttribute(dots, 3));
+    const dotMat = new THREE.PointsMaterial({ color: 4877480, size: 0.0135, sizeAttenuation: true, transparent: true, opacity: 0.85 });
+    world.add(new THREE.Points(dotGeo, dotMat));
+    const gratMat = new THREE.LineBasicMaterial({ color: 2241628, transparent: true, opacity: 0.28 });
+    for (let lat = -60; lat <= 60; lat += 30) {
+      const pts = [];
+      for (let lon = 0; lon <= 360; lon += 4) pts.push(latLngToV3(lat, lon, 0.988));
+      world.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gratMat));
+    }
+    const atm = new THREE.Mesh(
+      new THREE.SphereGeometry(1.06, 64, 64),
+      new THREE.ShaderMaterial({
+        transparent: true,
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: { c: { value: new THREE.Color(7183359) } },
+        vertexShader: `varying vec3 vN; void main(){ vN = normalize(normalMatrix*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+        fragmentShader: `varying vec3 vN; uniform vec3 c; void main(){ float i = pow(0.72 - dot(vN, vec3(0.,0.,1.)), 3.2); gl_FragColor = vec4(c, i*0.9); }`
+      })
+    );
+    scene.add(atm);
+    const starPos = [];
+    const sr = rng(42);
+    for (let i = 0; i < 700; i++) {
+      const v = new THREE.Vector3(sr() * 2 - 1, sr() * 2 - 1, sr() * 2 - 1).normalize().multiplyScalar(28 + sr() * 22);
+      starPos.push(v.x, v.y, v.z);
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute("position", new THREE.Float32BufferAttribute(starPos, 3));
+    scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 10335453, size: 0.09, transparent: true, opacity: 0.6 })));
+    scene.add(new THREE.AmbientLight(16777215, 0.85));
+    const key = new THREE.DirectionalLight(12374783, 0.9);
+    key.position.set(-3, 2, 4);
+    scene.add(key);
+    const glowTex = makeGlowTexture();
+    const markers = new THREE.Group();
+    world.add(markers);
+    const hitMeshes = [];
+    const markerMap = {};
+    AIRPORTS.forEach((a) => {
+      const pos = latLngToV3(a.lat, a.lng, 1.012);
+      const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, opacity: 0.9, depthWrite: false }));
+      spr.position.copy(pos);
+      spr.scale.setScalar(0.05);
+      markers.add(spr);
+      const hit = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 8), new THREE.MeshBasicMaterial({ visible: false }));
+      hit.position.copy(pos);
+      hit.userData.iata = a.iata;
+      markers.add(hit);
+      hitMeshes.push(hit);
+      markerMap[a.iata] = { sprite: spr, pos };
+    });
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.028, 0.038, 40),
+      new THREE.MeshBasicMaterial({ color: 15774804, transparent: true, opacity: 0.95, side: THREE.DoubleSide })
+    );
+    ring.visible = false;
+    world.add(ring);
+    const arcs = new THREE.Group();
+    world.add(arcs);
+    Object.assign(S, {
+      renderer,
+      scene,
+      camera,
+      world,
+      markers,
+      markerMap,
+      hitMeshes,
+      ring,
+      arcs,
+      targetRot: null,
+      vel: { x: 0, y: 0 },
+      dragging: false,
+      last: null,
+      moved: 0,
+      dist: 3.1,
+      targetDist: 3.1,
+      reduced,
+      hoverIata: null,
+      raf: 0,
+      autoRotate: true
+    });
+    const ray = new THREE.Raycaster();
+    ray.params.Points = { threshold: 0.03 };
+    const ptr = new THREE.Vector2();
+    const el = renderer.domElement;
+    const pointers = /* @__PURE__ */ new Map();
+    let pinchDist = 0;
+    const setPtr = (e) => {
+      const r2 = el.getBoundingClientRect();
+      ptr.x = (e.clientX - r2.left) / r2.width * 2 - 1;
+      ptr.y = -((e.clientY - r2.top) / r2.height) * 2 + 1;
+    };
+    const pick = () => {
+      ray.setFromCamera(ptr, camera);
+      const hits = ray.intersectObjects(hitMeshes, false);
+      return hits.length ? hits[0].object.userData.iata : null;
+    };
+    const onDown = (e) => {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        const [p1, p2] = [...pointers.values()];
+        pinchDist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      }
+      S.dragging = true;
+      S.moved = 0;
+      S.last = { x: e.clientX, y: e.clientY };
+      S.autoRotate = false;
+      S.targetRot = null;
+      el.style.cursor = "grabbing";
+      el.setPointerCapture(e.pointerId);
+    };
+    const onMove = (e) => {
+      if (pointers.has(e.pointerId)) pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 2) {
+        const [p1, p2] = [...pointers.values()];
+        const d2 = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+        if (pinchDist) {
+          S.targetDist = THREE.MathUtils.clamp(S.targetDist * (pinchDist / d2), 1.7, 5.2);
+        }
+        pinchDist = d2;
+        S.moved += 10;
+        return;
+      }
+      if (S.dragging && S.last) {
+        const dx = e.clientX - S.last.x, dy = e.clientY - S.last.y;
+        S.moved += Math.abs(dx) + Math.abs(dy);
+        world.rotation.y += dx * 52e-4;
+        world.rotation.x = THREE.MathUtils.clamp(world.rotation.x + dy * 52e-4, -1.15, 1.15);
+        S.vel = { x: dy * 52e-4, y: dx * 52e-4 };
+        S.last = { x: e.clientX, y: e.clientY };
+      } else {
+        setPtr(e);
+        const iata = pick();
+        if (iata !== S.hoverIata) {
+          S.hoverIata = iata;
+          el.style.cursor = iata ? "pointer" : "grab";
+          updateTip();
+        }
+      }
+    };
+    const onUp = (e) => {
+      pointers.delete(e.pointerId);
+      pinchDist = 0;
+      el.style.cursor = "grab";
+      if (S.dragging && S.moved < 7) {
+        setPtr(e);
+        const iata = pick();
+        if (iata) cbRef.current?.(iata);
+      }
+      S.dragging = false;
+      S.last = null;
+    };
+    const onWheel = (e) => {
+      e.preventDefault();
+      S.targetDist = THREE.MathUtils.clamp(S.targetDist + e.deltaY * 22e-4, 1.7, 5.2);
+    };
+    el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+    el.addEventListener("pointercancel", onUp);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    const tip = document.createElement("div");
+    tip.className = "globe-tip";
+    tip.style.display = "none";
+    labelWrapRef.current.appendChild(tip);
+    S.tip = tip;
+    function updateTip() {
+      if (!S.hoverIata) {
+        tip.style.display = "none";
+        return;
+      }
+      const a = byIata[S.hoverIata];
+      tip.innerHTML = `<span style="color:${T.gold};font-weight:700">${a.iata}</span> \xB7 ${a.city}, ${a.country}`;
+      tip.style.display = "block";
+    }
+    const resize = () => {
+      const w = wrap.clientWidth, h = wrap.clientHeight;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    };
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(wrap);
+    const v3 = new THREE.Vector3();
+    const camDir = new THREE.Vector3();
+    const clock = new THREE.Clock();
+    const animate = () => {
+      S.raf = requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      if (!S.dragging) {
+        if (S.targetRot) {
+          const dy = wrapAngle(S.targetRot.y - world.rotation.y);
+          const dx = S.targetRot.x - world.rotation.x;
+          world.rotation.y += dy * 0.085;
+          world.rotation.x += dx * 0.085;
+          if (Math.abs(dy) < 4e-3 && Math.abs(dx) < 4e-3) S.targetRot = null;
+        } else {
+          world.rotation.y += S.vel.y;
+          world.rotation.x = THREE.MathUtils.clamp(world.rotation.x + S.vel.x, -1.15, 1.15);
+          S.vel.x *= 0.93;
+          S.vel.y *= 0.93;
+          if (S.autoRotate && !S.reduced) world.rotation.y += 11e-4;
+        }
+      }
+      S.dist += (S.targetDist - S.dist) * 0.1;
+      camera.position.set(0, 0, S.dist);
+      if (!S.reduced) arcs.children.forEach((g) => {
+        if (g.userData.curve && g.userData.dot) {
+          g.userData.t = (g.userData.t + dt * 0.14) % 1;
+          g.userData.dot.position.copy(g.userData.curve.getPoint(g.userData.t));
+        }
+      });
+      if (S.ring.visible && S.ringPos) {
+        S.ring.position.copy(S.ringPos).multiplyScalar(1.014);
+        world.updateMatrixWorld();
+        S.ring.lookAt(world.localToWorld(v3.copy(S.ringPos).multiplyScalar(2)));
+        const s = 1 + Math.sin(clock.elapsedTime * 2.4) * 0.12;
+        S.ring.scale.setScalar(s);
+      }
+      world.updateMatrixWorld();
+      camera.getWorldDirection(camDir);
+      const labels = labelWrapRef.current?.querySelectorAll("[data-iata]") || [];
+      labels.forEach((elm) => {
+        const m = markerMap[elm.dataset.iata];
+        if (!m) return;
+        v3.copy(m.pos).applyMatrix4(world.matrixWorld);
+        const facing = v3.clone().normalize().dot(camera.position.clone().normalize());
+        const p = v3.clone().project(camera);
+        const w = wrap.clientWidth, h = wrap.clientHeight;
+        elm.style.left = (p.x + 1) / 2 * w + "px";
+        elm.style.top = (-p.y + 1) / 2 * h + "px";
+        const vis = facing > 0.22 && p.z < 1;
+        elm.style.opacity = vis ? 1 : 0;
+        elm.style.pointerEvents = vis ? "auto" : "none";
+      });
+      if (S.hoverIata && markerMap[S.hoverIata]) {
+        v3.copy(markerMap[S.hoverIata].pos).applyMatrix4(world.matrixWorld);
+        const p = v3.project(camera);
+        tip.style.left = (p.x + 1) / 2 * wrap.clientWidth + "px";
+        tip.style.top = (-p.y + 1) / 2 * wrap.clientHeight + "px";
+      }
+      renderer.render(scene, camera);
+    };
+    animate();
+    return () => {
+      cancelAnimationFrame(S.raf);
+      ro.disconnect();
+      el.removeEventListener("pointerdown", onDown);
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", onUp);
+      el.removeEventListener("pointercancel", onUp);
+      el.removeEventListener("wheel", onWheel);
+      renderer.dispose();
+      wrap.removeChild(el);
+      tip.remove();
+    };
+  }, []);
+  useEffect(() => {
+    const S = stateRef.current;
+    if (!S.world) return;
+    while (S.arcs.children.length) {
+      const c = S.arcs.children.pop();
+      c.traverse?.((n) => {
+        n.geometry?.dispose();
+        n.material?.dispose?.();
+      });
+      c.geometry?.dispose();
+      c.material?.dispose?.();
+    }
+    if (originIata && byIata[originIata]) {
+      const o = byIata[originIata];
+      S.ringPos = latLngToV3(o.lat, o.lng, 1);
+      S.ring.visible = true;
+      const v = S.ringPos.clone().normalize();
+      const yaw = Math.atan2(v.x, v.z);
+      const pitch = Math.atan2(v.y, Math.hypot(v.x, v.z));
+      S.targetRot = { y: -yaw, x: pitch * 0.9 };
+      S.autoRotate = false;
+      const targets = destIata ? [{ iata: destIata }] : (highlights || []).slice(0, 14);
+      targets.forEach((t) => {
+        const d = byIata[t.iata];
+        if (!d) return;
+        const line = buildArc(o, d, t.iata === destIata);
+        S.arcs.add(line);
+      });
+    } else {
+      S.ring.visible = false;
+      S.autoRotate = true;
+    }
+    const hlSet = new Set((highlights || []).map((h) => h.iata));
+    Object.entries(S.markerMap).forEach(([iata, m]) => {
+      const isOrigin = iata === originIata, isDest = iata === destIata, isHl = hlSet.has(iata);
+      m.sprite.scale.setScalar(isOrigin ? 0.085 : isDest ? 0.08 : isHl ? 0.065 : originIata ? 0.032 : 0.05);
+      m.sprite.material.opacity = isOrigin || isDest || isHl ? 1 : originIata ? 0.35 : 0.9;
+    });
+  }, [originIata, destIata, highlights]);
+  const labelItems = useMemo(() => {
+    if (!originIata) return [];
+    if (destIata) {
+      const d = byIata[destIata];
+      const hl = (highlights || []).find((h) => h.iata === destIata);
+      return d ? [{ iata: d.iata, city: d.city, price: hl?.price }] : [];
+    }
+    return (highlights || []).slice(0, 14).map((h) => ({ iata: h.iata, city: byIata[h.iata]?.city, price: h.price }));
+  }, [originIata, destIata, highlights]);
+  return /* @__PURE__ */ React.createElement("div", { ref: wrapRef, className, style: { position: "relative", overflow: "hidden", ...style } }, /* @__PURE__ */ React.createElement("div", { ref: labelWrapRef, style: { position: "absolute", inset: 0, pointerEvents: "none" } }, labelItems.map((l) => /* @__PURE__ */ React.createElement(
+    "div",
+    {
+      key: l.iata,
+      "data-iata": l.iata,
+      className: "globe-label",
+      style: { opacity: 0 },
+      onClick: () => onPickAirport?.(l.iata),
+      role: "button",
+      tabIndex: 0,
+      onKeyDown: (e) => e.key === "Enter" && onPickAirport?.(l.iata)
+    },
+    l.city,
+    l.price != null && /* @__PURE__ */ React.createElement("b", null, money(l.price))
+  ))));
+}
+function wrapAngle(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+function buildArc(o, d, emphasized) {
+  const v1 = latLngToV3(o.lat, o.lng, 1.005), v2 = latLngToV3(d.lat, d.lng, 1.005);
+  const dist = v1.distanceTo(v2);
+  const mid = v1.clone().add(v2).multiplyScalar(0.5).normalize().multiplyScalar(1 + 0.12 + dist * 0.28);
+  const c1 = v1.clone().lerp(mid, 0.45).normalize().multiplyScalar(1 + 0.08 + dist * 0.22);
+  const c2 = v2.clone().lerp(mid, 0.45).normalize().multiplyScalar(1 + 0.08 + dist * 0.22);
+  const curve = new THREE.CubicBezierCurve3(v1, c1, c2, v2);
+  const pts = curve.getPoints(72);
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  const mat = new THREE.LineDashedMaterial({
+    color: emphasized ? 16766346 : 15774804,
+    transparent: true,
+    opacity: emphasized ? 0.95 : 0.55,
+    dashSize: 0.05,
+    gapSize: 0.028,
+    linewidth: 1
+  });
+  const line = new THREE.Line(geo, mat);
+  line.computeLineDistances();
+  const g = new THREE.Group();
+  g.add(line);
+  const dot = new THREE.Sprite(new THREE.SpriteMaterial({ map: sharedGlowTex(), transparent: true, opacity: emphasized ? 1 : 0.8, depthWrite: false }));
+  dot.scale.setScalar(emphasized ? 0.05 : 0.036);
+  dot.position.copy(pts[0]);
+  g.add(dot);
+  g.userData = { curve, dot, t: Math.random() };
+  return g;
+}
+let _sharedGlow = null;
+function sharedGlowTex() {
+  if (!_sharedGlow) _sharedGlow = makeGlowTexture();
+  return _sharedGlow;
+}
+const I = {
+  plane: (p) => /* @__PURE__ */ React.createElement("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round", ...p }, /* @__PURE__ */ React.createElement("path", { d: "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" })),
+  swap: (p) => /* @__PURE__ */ React.createElement("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", ...p }, /* @__PURE__ */ React.createElement("path", { d: "M8 3 4 7l4 4" }), /* @__PURE__ */ React.createElement("path", { d: "M4 7h16" }), /* @__PURE__ */ React.createElement("path", { d: "m16 21 4-4-4-4" }), /* @__PURE__ */ React.createElement("path", { d: "M20 17H4" })),
+  search: (p) => /* @__PURE__ */ React.createElement("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", ...p }, /* @__PURE__ */ React.createElement("circle", { cx: "11", cy: "11", r: "7" }), /* @__PURE__ */ React.createElement("path", { d: "m21 21-4.3-4.3" })),
+  clock: (p) => /* @__PURE__ */ React.createElement("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", ...p }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /* @__PURE__ */ React.createElement("path", { d: "M12 7v5l3 2" })),
+  bag: (p) => /* @__PURE__ */ React.createElement("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", ...p }, /* @__PURE__ */ React.createElement("rect", { x: "6", y: "7", width: "12", height: "13", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M9 7V5a3 3 0 0 1 6 0v2" })),
+  check: (p) => /* @__PURE__ */ React.createElement("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round", ...p }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 12.5 5 5 10-11" })),
+  chevL: (p) => /* @__PURE__ */ React.createElement("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.2", strokeLinecap: "round", strokeLinejoin: "round", ...p }, /* @__PURE__ */ React.createElement("path", { d: "m15 5-7 7 7 7" })),
+  globe: (p) => /* @__PURE__ */ React.createElement("svg", { width: "17", height: "17", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", ...p }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "12", r: "9" }), /* @__PURE__ */ React.createElement("ellipse", { cx: "12", cy: "12", rx: "4", ry: "9" }), /* @__PURE__ */ React.createElement("path", { d: "M3.5 9h17M3.5 15h17" })),
+  download: (p) => /* @__PURE__ */ React.createElement("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", ...p }, /* @__PURE__ */ React.createElement("path", { d: "M12 3v12" }), /* @__PURE__ */ React.createElement("path", { d: "m7 11 5 5 5-5" }), /* @__PURE__ */ React.createElement("path", { d: "M4 20h16" })),
+  cal: (p) => /* @__PURE__ */ React.createElement("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", ...p }, /* @__PURE__ */ React.createElement("rect", { x: "4", y: "5", width: "16", height: "16", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M8 3v4M16 3v4M4 10h16" })),
+  card: (p) => /* @__PURE__ */ React.createElement("svg", { width: "17", height: "17", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", ...p }, /* @__PURE__ */ React.createElement("rect", { x: "3", y: "6", width: "18", height: "13", rx: "2" }), /* @__PURE__ */ React.createElement("path", { d: "M3 10.5h18" })),
+  shield: (p) => /* @__PURE__ */ React.createElement("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinejoin: "round", ...p }, /* @__PURE__ */ React.createElement("path", { d: "M12 3 5 6v5c0 5 3.2 8.4 7 10 3.8-1.6 7-5 7-10V6l-7-3z" })),
+  user: (p) => /* @__PURE__ */ React.createElement("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", ...p }, /* @__PURE__ */ React.createElement("circle", { cx: "12", cy: "8", r: "4" }), /* @__PURE__ */ React.createElement("path", { d: "M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5" }))
+};
+function AirlineMark({ airline, size = 40 }) {
+  return /* @__PURE__ */ React.createElement("div", { "aria-hidden": true, style: {
+    width: size,
+    height: size,
+    borderRadius: 12,
+    flexShrink: 0,
+    display: "grid",
+    placeItems: "center",
+    background: `linear-gradient(140deg, ${airline.color}33, ${airline.color}11)`,
+    border: `1px solid ${airline.color}55`,
+    color: airline.color,
+    fontWeight: 800,
+    fontSize: size * 0.34,
+    fontFamily: "'Space Grotesk',sans-serif"
+  } }, airline.code);
+}
+function Spinner({ size = 18 }) {
+  return /* @__PURE__ */ React.createElement("span", { className: "spin", "aria-label": "Loading", style: { width: size, height: size, border: `2px solid ${T.line}`, borderTopColor: T.gold, borderRadius: "50%" } });
+}
+function AirportInput({ label, value, onChange, placeholder, excludeIata }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+  const results = useMemo(() => AirportService.search(q).filter((a) => a.iata !== excludeIata), [q, excludeIata]);
+  useEffect(() => {
+    const h = (e) => {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", h);
+    return () => document.removeEventListener("pointerdown", h);
+  }, []);
+  const sel = value ? byIata[value] : null;
+  return /* @__PURE__ */ React.createElement("div", { ref: boxRef, style: { position: "relative" } }, /* @__PURE__ */ React.createElement("label", null, label), /* @__PURE__ */ React.createElement(
+    "input",
+    {
+      value: open ? q : sel ? `${sel.city} \xB7 ${sel.iata}` : "",
+      placeholder,
+      onFocus: () => {
+        setOpen(true);
+        setQ("");
+      },
+      onChange: (e) => {
+        setQ(e.target.value);
+        setOpen(true);
+      },
+      "aria-label": label,
+      autoComplete: "off"
+    }
+  ), open && (q ? results : AIRPORTS.slice(0, 6).filter((a) => a.iata !== excludeIata)).length > 0 && /* @__PURE__ */ React.createElement("div", { className: "glass", role: "listbox", style: { position: "absolute", zIndex: 60, top: "calc(100% + 6px)", left: 0, right: 0, maxHeight: 268, overflowY: "auto", padding: 6, background: "rgba(10,16,32,0.96)" } }, (q ? results : AIRPORTS.slice(0, 6).filter((a) => a.iata !== excludeIata)).map((a) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: a.iata,
+      role: "option",
+      onClick: () => {
+        onChange(a.iata);
+        setOpen(false);
+      },
+      style: { display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "10px 10px", borderRadius: 10, textAlign: "left" },
+      onMouseEnter: (e) => e.currentTarget.style.background = "rgba(240,180,84,0.08)",
+      onMouseLeave: (e) => e.currentTarget.style.background = "transparent"
+    },
+    /* @__PURE__ */ React.createElement("span", { style: { color: T.gold, fontWeight: 700, fontFamily: "'Space Grotesk',sans-serif", width: 42 } }, a.iata),
+    /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("span", { style: { display: "block", fontWeight: 600, fontSize: 14.5 } }, a.city, " ", /* @__PURE__ */ React.createElement("span", { style: { color: T.faint, fontWeight: 400 } }, "\xB7 ", a.country)), /* @__PURE__ */ React.createElement("span", { style: { display: "block", fontSize: 12.5, color: T.muted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, a.name))
+  ))));
+}
+const CABINS = [["economy", "Economy"], ["premium", "Premium Economy"], ["business", "Business"], ["first", "First"]];
+function SearchPanel({ form, setForm, onSearch, searching, compact }) {
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const canSearch = form.origin && form.destination && form.depart;
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gap: 14 } }, /* @__PURE__ */ React.createElement("div", { className: "seg", role: "tablist", "aria-label": "Trip type" }, /* @__PURE__ */ React.createElement("button", { className: form.trip === "round" ? "on" : "", onClick: () => set("trip", "round") }, "Round trip"), /* @__PURE__ */ React.createElement("button", { className: form.trip === "oneway" ? "on" : "", onClick: () => set("trip", "oneway") }, "One way")), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: compact ? "1fr" : "1fr auto 1fr", gap: 10, alignItems: "end" } }, /* @__PURE__ */ React.createElement(AirportInput, { label: "From", value: form.origin, excludeIata: form.destination, placeholder: "City, airport or IATA", onChange: (v) => set("origin", v) }), !compact && /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      className: "btn-ghost",
+      "aria-label": "Swap origin and destination",
+      style: { minHeight: 46, padding: "0 13px" },
+      onClick: () => setForm((f) => ({ ...f, origin: f.destination, destination: f.origin }))
+    },
+    /* @__PURE__ */ React.createElement(I.swap, null)
+  ), /* @__PURE__ */ React.createElement(AirportInput, { label: "To", value: form.destination, excludeIata: form.origin, placeholder: "City, airport or IATA", onChange: (v) => set("destination", v) })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: form.trip === "round" ? "1fr 1fr" : "1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Departure"), /* @__PURE__ */ React.createElement("input", { type: "date", value: form.depart, min: toISODate(/* @__PURE__ */ new Date()), onChange: (e) => set("depart", e.target.value), "aria-label": "Departure date" })), form.trip === "round" && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Return"), /* @__PURE__ */ React.createElement("input", { type: "date", value: form.ret, min: form.depart || toISODate(/* @__PURE__ */ new Date()), onChange: (e) => set("ret", e.target.value), "aria-label": "Return date" }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Passengers"), /* @__PURE__ */ React.createElement("select", { value: form.pax, onChange: (e) => set("pax", +e.target.value), "aria-label": "Passengers" }, [1, 2, 3, 4, 5, 6].map((n) => /* @__PURE__ */ React.createElement("option", { key: n, value: n }, n, " ", n === 1 ? "passenger" : "passengers")))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Cabin"), /* @__PURE__ */ React.createElement("select", { value: form.cabin, onChange: (e) => set("cabin", e.target.value), "aria-label": "Cabin class" }, CABINS.map(([v, l]) => /* @__PURE__ */ React.createElement("option", { key: v, value: v }, l))))), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", disabled: !canSearch || searching, onClick: onSearch, style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 10 } }, searching ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Spinner, { size: 16 }), " Searching flights\u2026") : /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(I.search, null), " Search flights")), !form.destination && form.origin && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.muted, textAlign: "center" } }, "Or tap a glowing destination on the globe \u2014 prices are already waiting."));
+}
+const VIBES = [["beach", "Beach"], ["city", "City break"], ["nightlife", "Nightlife"], ["nature", "Nature"], ["luxury", "Luxury"], ["weekend", "Weekend trip"], ["warm", "Warm"]];
+function ExplorePanel({ explore, setExplore, results, origin, onPickDest }) {
+  const set = (k, v) => setExplore((f) => ({ ...f, [k]: v }));
+  const toggleTag = (t) => set("tags", explore.tags.includes(t) ? explore.tags.filter((x) => x !== t) : [...explore.tags, t]);
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gap: 16 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Where from?"), /* @__PURE__ */ React.createElement(AirportInput, { label: "", value: origin, placeholder: "Choose your origin", onChange: (v) => setExplore((f) => ({ ...f, origin: v })) })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Max budget"), /* @__PURE__ */ React.createElement("select", { value: explore.maxBudget || "", onChange: (e) => set("maxBudget", e.target.value ? +e.target.value : null) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Any price"), [100, 150, 250, 400, 700, 1200].map((b) => /* @__PURE__ */ React.createElement("option", { key: b, value: b }, "Under $", b)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Max flight time"), /* @__PURE__ */ React.createElement("select", { value: explore.maxDurationH || "", onChange: (e) => set("maxDurationH", e.target.value ? +e.target.value : null) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Any duration"), [3, 5, 8, 12].map((h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, "Up to ", h, "h"))))), /* @__PURE__ */ React.createElement("button", { className: `chip ${explore.directOnly ? "on" : ""}`, onClick: () => set("directOnly", !explore.directOnly), style: { justifySelf: "start" } }, "Direct flights only"), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Vibe"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8 } }, VIBES.map(([v, l]) => /* @__PURE__ */ React.createElement("button", { key: v, className: `chip ${explore.tags.includes(v) ? "on" : ""}`, onClick: () => toggleTag(v), "aria-pressed": explore.tags.includes(v) }, l)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${T.line}`, paddingTop: 12 } }, /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.muted, marginBottom: 10 } }, origin ? `${results.length} destinations from ${byIata[origin]?.city}` : "Pick an origin to light up the globe"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gap: 6, maxHeight: 260, overflowY: "auto" }, className: "hide-scroll" }, results.slice(0, 20).map((r) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: r.airport.iata,
+      onClick: () => onPickDest(r.airport.iata),
+      style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 10, border: `1px solid ${T.line}`, textAlign: "left" },
+      onMouseEnter: (e) => e.currentTarget.style.borderColor = "rgba(240,180,84,0.5)",
+      onMouseLeave: (e) => e.currentTarget.style.borderColor = T.line
+    },
+    /* @__PURE__ */ React.createElement("span", null, /* @__PURE__ */ React.createElement("span", { style: { fontWeight: 600, fontSize: 14.5 } }, r.airport.city), /* @__PURE__ */ React.createElement("span", { style: { color: T.faint, fontSize: 12.5, marginLeft: 8 } }, r.airport.iata, r.direct ? " \xB7 direct" : "")),
+    /* @__PURE__ */ React.createElement("span", { className: "mono-num", style: { color: T.gold, fontWeight: 700 } }, money(r.price))
+  )))));
+}
+function stopsLabel(o) {
+  return o.stops === 0 ? "Direct" : o.stops === 1 ? `1 stop \xB7 ${o.via}` : `${o.stops} stops`;
+}
+function ResultsPage({ query, offers, loading, onSelect, onBack }) {
+  const [sort, setSort] = useState("best");
+  const [fDirect, setFDirect] = useState(false);
+  const [fAirlines, setFAirlines] = useState([]);
+  const [fMaxPrice, setFMaxPrice] = useState(null);
+  const [fMaxDur, setFMaxDur] = useState(null);
+  const [fDep, setFDep] = useState(null);
+  const [fBags, setFBags] = useState(false);
+  const airlinesPresent = useMemo(() => [...new Set(offers.map((o2) => o2.airline.code))].map((c) => AIRLINES.find((a) => a.code === c)), [offers]);
+  const filtered = useMemo(() => {
+    let list = offers.filter((o2) => {
+      if (fDirect && o2.stops > 0) return false;
+      if (fAirlines.length && !fAirlines.includes(o2.airline.code)) return false;
+      if (fMaxPrice && o2.price > fMaxPrice) return false;
+      if (fMaxDur && o2.durationMin > fMaxDur * 60) return false;
+      if (fBags && o2.fareType === "Basic") return false;
+      if (fDep) {
+        const h = +o2.depTime.slice(0, 2);
+        if (fDep === "morning" && !(h >= 5 && h < 12)) return false;
+        if (fDep === "afternoon" && !(h >= 12 && h < 18)) return false;
+        if (fDep === "evening" && !(h >= 18 || h < 5)) return false;
+      }
+      return true;
+    });
+    const score = (o2) => o2.price * 0.6 + o2.durationMin * 0.9 + o2.stops * 90;
+    if (sort === "cheapest") list.sort((a, b) => a.price - b.price);
+    if (sort === "fastest") list.sort((a, b) => a.durationMin - b.durationMin);
+    if (sort === "best") list.sort((a, b) => score(a) - score(b));
+    return list;
+  }, [offers, sort, fDirect, fAirlines, fMaxPrice, fMaxDur, fDep, fBags]);
+  const o = byIata[query.origin], d = byIata[query.destination];
+  return /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { maxWidth: 900, margin: "0 auto", padding: "26px 18px 80px" } }, /* @__PURE__ */ React.createElement("button", { className: "navlink", onClick: onBack, style: { display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 8, paddingLeft: 0 } }, /* @__PURE__ */ React.createElement(I.chevL, null), " Back to globe"), /* @__PURE__ */ React.createElement("h1", { className: "disp", style: { fontSize: "clamp(24px,4vw,34px)", fontWeight: 700 } }, o?.city, " ", /* @__PURE__ */ React.createElement("span", { style: { color: T.faint } }, "\u2192"), " ", d?.city), /* @__PURE__ */ React.createElement("p", { style: { color: T.muted, fontSize: 14.5, marginBottom: 20 } }, fmtDate(query.depart), query.trip === "round" && query.ret ? ` \u2013 ${fmtDate(query.ret)}` : "", " \xB7 ", query.pax, " ", query.pax === 1 ? "adult" : "adults", " \xB7 ", CABINS.find(([v]) => v === query.cabin)?.[1]), /* @__PURE__ */ React.createElement("div", { className: "seg", style: { maxWidth: 380, marginBottom: 14 }, role: "tablist", "aria-label": "Sort results" }, [["best", "Best"], ["cheapest", "Cheapest"], ["fastest", "Fastest"]].map(([v, l]) => /* @__PURE__ */ React.createElement("button", { key: v, className: sort === v ? "on" : "", onClick: () => setSort(v) }, l))), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 } }, /* @__PURE__ */ React.createElement("button", { className: `chip ${fDirect ? "on" : ""}`, onClick: () => setFDirect(!fDirect) }, "Direct only"), /* @__PURE__ */ React.createElement("button", { className: `chip ${fBags ? "on" : ""}`, onClick: () => setFBags(!fBags) }, "Checked bag included"), /* @__PURE__ */ React.createElement("select", { value: fDep || "", onChange: (e) => setFDep(e.target.value || null), style: { width: "auto", minHeight: 38, padding: "6px 12px", borderRadius: 999, fontSize: 13.5, background: fDep ? T.goldSoft : "rgba(255,255,255,0.04)", color: fDep ? T.gold : T.muted, borderColor: fDep ? T.gold : T.line } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Departure time"), /* @__PURE__ */ React.createElement("option", { value: "morning" }, "Morning 05\u201312"), /* @__PURE__ */ React.createElement("option", { value: "afternoon" }, "Afternoon 12\u201318"), /* @__PURE__ */ React.createElement("option", { value: "evening" }, "Evening 18\u201305")), /* @__PURE__ */ React.createElement("select", { value: fMaxDur || "", onChange: (e) => setFMaxDur(e.target.value ? +e.target.value : null), style: { width: "auto", minHeight: 38, padding: "6px 12px", borderRadius: 999, fontSize: 13.5, background: fMaxDur ? T.goldSoft : "rgba(255,255,255,0.04)", color: fMaxDur ? T.gold : T.muted, borderColor: fMaxDur ? T.gold : T.line } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Max duration"), [4, 6, 9, 14, 20].map((h) => /* @__PURE__ */ React.createElement("option", { key: h, value: h }, "Up to ", h, "h"))), /* @__PURE__ */ React.createElement("select", { value: fMaxPrice || "", onChange: (e) => setFMaxPrice(e.target.value ? +e.target.value : null), style: { width: "auto", minHeight: 38, padding: "6px 12px", borderRadius: 999, fontSize: 13.5, background: fMaxPrice ? T.goldSoft : "rgba(255,255,255,0.04)", color: fMaxPrice ? T.gold : T.muted, borderColor: fMaxPrice ? T.gold : T.line } }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Max price"), [150, 250, 400, 700, 1200, 2500].map((p) => /* @__PURE__ */ React.createElement("option", { key: p, value: p }, "Under $", p))), airlinesPresent.map((a) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: a.code,
+      className: `chip ${fAirlines.includes(a.code) ? "on" : ""}`,
+      onClick: () => setFAirlines((x) => x.includes(a.code) ? x.filter((c) => c !== a.code) : [...x, a.code])
+    },
+    a.name
+  ))), loading ? /* @__PURE__ */ React.createElement("div", { style: { display: "grid", placeItems: "center", padding: "70px 0", gap: 14 } }, /* @__PURE__ */ React.createElement(Spinner, { size: 28 }), /* @__PURE__ */ React.createElement("p", { style: { color: T.muted, fontSize: 14.5 } }, "Comparing fares across airlines\u2026")) : filtered.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 30, textAlign: "center" } }, /* @__PURE__ */ React.createElement("p", { style: { fontWeight: 600, marginBottom: 6 } }, "No flights match these filters"), /* @__PURE__ */ React.createElement("p", { style: { color: T.muted, fontSize: 14 } }, "Loosen the filters above to see all ", offers.length, " options for this route.")) : /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gap: 12 } }, filtered.map((of, idx) => /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      key: of.id,
+      className: "card fadeup",
+      onClick: () => onSelect(of),
+      style: { display: "block", width: "100%", textAlign: "left", padding: 18, animationDelay: `${Math.min(idx * 40, 300)}ms`, transition: "border-color .15s, transform .15s" },
+      onMouseEnter: (e) => {
+        e.currentTarget.style.borderColor = "rgba(240,180,84,0.55)";
+        e.currentTarget.style.transform = "translateY(-2px)";
+      },
+      onMouseLeave: (e) => {
+        e.currentTarget.style.borderColor = T.line;
+        e.currentTarget.style.transform = "none";
+      }
+    },
+    /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(AirlineMark, { airline: of.airline }), /* @__PURE__ */ React.createElement("div", { style: { flex: "1 1 220px", minWidth: 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 10 } }, /* @__PURE__ */ React.createElement("span", { className: "disp mono-num", style: { fontSize: 21, fontWeight: 700 } }, of.depTime), /* @__PURE__ */ React.createElement("span", { style: { color: T.faint } }, "\u2013\u2013\u2013\u2013\u2708\u2013\u2013\u2013\u2013"), /* @__PURE__ */ React.createElement("span", { className: "disp mono-num", style: { fontSize: 21, fontWeight: 700 } }, of.arrTime, of.dayShift > 0 && /* @__PURE__ */ React.createElement("sup", { style: { color: T.gold, fontSize: 11 } }, " +", of.dayShift))), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 13, color: T.muted, marginTop: 2 } }, of.origin, " \u2192 ", of.destination, " \xB7 ", of.airline.name, " ", of.flightNo)), /* @__PURE__ */ React.createElement("div", { style: { flex: "0 1 auto", fontSize: 13.5, color: T.muted, display: "grid", gap: 3 } }, /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(I.clock, null), " ", fmtDur(of.durationMin)), /* @__PURE__ */ React.createElement("span", { style: { color: of.stops === 0 ? T.green : T.muted } }, stopsLabel(of)), /* @__PURE__ */ React.createElement("span", { style: { display: "inline-flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement(I.bag, null), " ", of.bagsIncluded)), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", textAlign: "right" } }, /* @__PURE__ */ React.createElement("div", { className: "disp mono-num", style: { fontSize: 24, fontWeight: 700, color: T.gold } }, money(of.price)), /* @__PURE__ */ React.createElement("div", { style: { fontSize: 12, color: T.faint } }, of.passengers > 1 ? `total \xB7 ${of.passengers} pax` : "per traveller", " \xB7 ", of.fareType)))
+  ))));
+}
+function DetailRow({ k, v, accent }) {
+  return /* @__PURE__ */ React.createElement("div", { className: "table-row" }, /* @__PURE__ */ React.createElement("span", { style: { color: T.muted } }, k), /* @__PURE__ */ React.createElement("span", { className: "mono-num", style: { fontWeight: 600, color: accent ? T.gold : T.text, textAlign: "right" } }, v));
+}
+function FlightDetails({ offer, query, onContinue, onBack }) {
+  const o = byIata[offer.origin], d = byIata[offer.destination];
+  const legs = offer.stops === 0 ? [{ from: o, to: d, dep: offer.depTime, arr: offer.arrTime, no: offer.flightNo }] : [
+    { from: o, to: byIata[offer.via], dep: offer.depTime, arr: "\u2014", no: offer.flightNo },
+    { from: byIata[offer.via], to: d, dep: "\u2014", arr: offer.arrTime, no: `${offer.airline.code}${+offer.flightNo.slice(2) + 12}` }
+  ];
+  return /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { maxWidth: 760, margin: "0 auto", padding: "26px 18px 90px" } }, /* @__PURE__ */ React.createElement("button", { className: "navlink", onClick: onBack, style: { display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 8, paddingLeft: 0 } }, /* @__PURE__ */ React.createElement(I.chevL, null), " All flights"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 14, marginBottom: 6 } }, /* @__PURE__ */ React.createElement(AirlineMark, { airline: offer.airline, size: 48 }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("h1", { className: "disp", style: { fontSize: "clamp(22px,3.5vw,30px)", fontWeight: 700 } }, o.city, " \u2192 ", d.city), /* @__PURE__ */ React.createElement("p", { style: { color: T.muted, fontSize: 14 } }, fmtDate(offer.date), " \xB7 ", offer.airline.name, " \xB7 operated by ", offer.airline.name))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 20, marginTop: 16 } }, /* @__PURE__ */ React.createElement("h2", { className: "disp", style: { fontSize: 16, fontWeight: 700, marginBottom: 12, color: T.gold } }, "Itinerary"), legs.map((leg, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: { display: "grid", gridTemplateColumns: "18px 1fr", gap: 14, paddingBottom: i < legs.length - 1 ? 18 : 0 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", justifyItems: "center" } }, /* @__PURE__ */ React.createElement("span", { className: "pulse-dot", style: { width: 9, height: 9, borderRadius: "50%", background: T.gold, marginTop: 6 } }), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, width: 2, background: `linear-gradient(${T.gold}66, transparent)`, minHeight: 42 } })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontWeight: 600 } }, /* @__PURE__ */ React.createElement("span", { className: "mono-num" }, leg.dep), " \xB7 ", leg.from.city, " ", /* @__PURE__ */ React.createElement("span", { style: { color: T.faint } }, "(", leg.from.iata, ")"), i === 0 && /* @__PURE__ */ React.createElement("span", { style: { color: T.muted, fontWeight: 400 } }, " \xB7 Terminal ", offer.depTerminal)), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.muted, margin: "4px 0 8px" } }, "Flight ", leg.no, " \xB7 ", offer.aircraft, " \xB7 ", offer.cabin === "economy" ? "Economy" : CABINS.find(([v]) => v === offer.cabin)?.[1], " \xB7 seat pitch ", offer.seatPitch), /* @__PURE__ */ React.createElement("p", { style: { fontWeight: 600 } }, /* @__PURE__ */ React.createElement("span", { className: "mono-num" }, leg.arr), " \xB7 ", leg.to.city, " ", /* @__PURE__ */ React.createElement("span", { style: { color: T.faint } }, "(", leg.to.iata, ")"), i === legs.length - 1 && /* @__PURE__ */ React.createElement("span", { style: { color: T.muted, fontWeight: 400 } }, " \xB7 Terminal ", offer.arrTerminal)), i < legs.length - 1 && /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.gold, marginTop: 8 } }, "Layover in ", leg.to.city)))), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px solid ${T.line}`, marginTop: 16, paddingTop: 10 } }, /* @__PURE__ */ React.createElement(DetailRow, { k: "Total duration", v: fmtDur(offer.durationMin) }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Stops", v: stopsLabel(offer) }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Baggage allowance", v: offer.bagsIncluded }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Fare", v: offer.fareType }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Cancellation", v: offer.refundable ? "Refundable (fee-free within 24h)" : "Non-refundable" }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Changes", v: offer.changeFee === 0 ? "Free date changes" : offer.changeFee ? `$${offer.changeFee} change fee` : "Not changeable" }))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 20, marginTop: 14 } }, /* @__PURE__ */ React.createElement("h2", { className: "disp", style: { fontSize: 16, fontWeight: 700, marginBottom: 8, color: T.gold } }, "Price breakdown"), /* @__PURE__ */ React.createElement(DetailRow, { k: `Fare \xD7 ${offer.passengers}`, v: money(offer.priceBase) }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Taxes", v: money(offer.taxes) }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Airline fees", v: money(offer.carrierFees) }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Total", v: money(offer.price), accent: true })), /* @__PURE__ */ React.createElement("div", { style: { position: "sticky", bottom: 14, marginTop: 22 } }, /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { width: "100%", fontSize: 16 }, onClick: onContinue }, "Continue \u2014 ", money(offer.price))));
+}
+function StepBar({ step }) {
+  const steps = ["Flight", "Passengers", "Extras", "Payment", "Done"];
+  return /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 6, justifyContent: "center", margin: "18px 0 6px" }, "aria-label": `Step ${step + 1} of ${steps.length}: ${steps[step]}` }, steps.map((s, i) => /* @__PURE__ */ React.createElement("div", { key: s, style: { display: "flex", alignItems: "center", gap: 6 } }, /* @__PURE__ */ React.createElement("span", { style: {
+    width: 26,
+    height: 26,
+    borderRadius: "50%",
+    display: "grid",
+    placeItems: "center",
+    fontSize: 12,
+    fontWeight: 700,
+    background: i < step ? T.goldSoft : i === step ? T.gold : "rgba(255,255,255,0.05)",
+    color: i === step ? "#1A1206" : i < step ? T.gold : T.faint,
+    border: `1px solid ${i <= step ? T.gold : T.line}`
+  } }, i < step ? /* @__PURE__ */ React.createElement(I.check, null) : i + 1), /* @__PURE__ */ React.createElement("span", { className: "desktop-only", style: { fontSize: 12.5, color: i === step ? T.text : T.faint, marginRight: 6 } }, s))));
+}
+const NATIONALITIES = ["Israel", "United States", "United Kingdom", "France", "Germany", "Italy", "Spain", "Greece", "Netherlands", "Portugal", "Cyprus", "Poland", "Romania", "Canada", "Australia", "UAE", "India", "Japan", "Brazil", "Other"];
+const emptyPax = () => ({ first: "", last: "", gender: "", dob: "", nationality: "", passport: "", passportExp: "" });
+function PassengersPage({ offer, count, onContinue, onBack }) {
+  const [pax, setPax] = useState(Array.from({ length: count }, emptyPax));
+  const [contact, setContact] = useState({ email: "", phone: "" });
+  const [tried, setTried] = useState(false);
+  const setP = (i, k, v) => setPax((arr) => arr.map((p, j) => j === i ? { ...p, [k]: v } : p));
+  const paxValid = (p) => p.first && p.last && p.gender && p.dob && p.nationality && p.passport && p.passportExp;
+  const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email);
+  const valid = pax.every(paxValid) && emailOk && contact.phone.length >= 7;
+  const err = (cond) => tried && !cond ? { borderColor: T.red } : {};
+  return /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { maxWidth: 700, margin: "0 auto", padding: "10px 18px 90px" } }, /* @__PURE__ */ React.createElement(StepBar, { step: 1 }), /* @__PURE__ */ React.createElement("h1", { className: "disp", style: { fontSize: "clamp(22px,3.5vw,30px)", fontWeight: 700, textAlign: "center", marginBottom: 4 } }, "Who's flying?"), /* @__PURE__ */ React.createElement("p", { style: { color: T.muted, fontSize: 14, textAlign: "center", marginBottom: 20 } }, "Names exactly as they appear on the passport."), pax.map((p, i) => /* @__PURE__ */ React.createElement("div", { key: i, className: "card", style: { padding: 20, marginBottom: 14 } }, /* @__PURE__ */ React.createElement("h2", { className: "disp", style: { fontSize: 15, fontWeight: 700, color: T.gold, marginBottom: 14 } }, "Passenger ", i + 1, i === 0 ? " \xB7 lead" : ""), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "First name"), /* @__PURE__ */ React.createElement("input", { style: err(p.first), value: p.first, onChange: (e) => setP(i, "first", e.target.value), autoComplete: "given-name" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Last name"), /* @__PURE__ */ React.createElement("input", { style: err(p.last), value: p.last, onChange: (e) => setP(i, "last", e.target.value), autoComplete: "family-name" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Gender"), /* @__PURE__ */ React.createElement("select", { style: err(p.gender), value: p.gender, onChange: (e) => setP(i, "gender", e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select"), /* @__PURE__ */ React.createElement("option", null, "Female"), /* @__PURE__ */ React.createElement("option", null, "Male"), /* @__PURE__ */ React.createElement("option", null, "Other / X"))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Date of birth"), /* @__PURE__ */ React.createElement("input", { style: err(p.dob), type: "date", max: toISODate(/* @__PURE__ */ new Date()), value: p.dob, onChange: (e) => setP(i, "dob", e.target.value) })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Nationality"), /* @__PURE__ */ React.createElement("select", { style: err(p.nationality), value: p.nationality, onChange: (e) => setP(i, "nationality", e.target.value) }, /* @__PURE__ */ React.createElement("option", { value: "" }, "Select"), NATIONALITIES.map((n) => /* @__PURE__ */ React.createElement("option", { key: n }, n)))), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Passport number"), /* @__PURE__ */ React.createElement("input", { style: err(p.passport), value: p.passport, onChange: (e) => setP(i, "passport", e.target.value.toUpperCase()) })), /* @__PURE__ */ React.createElement("div", { style: { gridColumn: "1 / -1" } }, /* @__PURE__ */ React.createElement("label", null, "Passport expiration"), /* @__PURE__ */ React.createElement("input", { style: err(p.passportExp), type: "date", min: toISODate(/* @__PURE__ */ new Date()), value: p.passportExp, onChange: (e) => setP(i, "passportExp", e.target.value) }))))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 20, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h2", { className: "disp", style: { fontSize: 15, fontWeight: 700, color: T.gold, marginBottom: 14 } }, "Contact details"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Email"), /* @__PURE__ */ React.createElement("input", { style: err(emailOk), type: "email", value: contact.email, onChange: (e) => setContact({ ...contact, email: e.target.value }), autoComplete: "email", placeholder: "you@example.com" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Phone"), /* @__PURE__ */ React.createElement("input", { style: err(contact.phone.length >= 7), type: "tel", value: contact.phone, onChange: (e) => setContact({ ...contact, phone: e.target.value }), autoComplete: "tel", placeholder: "+972 50 000 0000" }))), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12.5, color: T.faint, marginTop: 10 } }, "Your e-ticket and any schedule changes go here.")), tried && !valid && /* @__PURE__ */ React.createElement("p", { style: { color: T.red, fontSize: 13.5, marginBottom: 12 } }, "A few fields are missing or invalid \u2014 they're outlined in red above."), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", onClick: onBack }, "Back"), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { flex: 1 }, onClick: () => {
+    setTried(true);
+    if (valid) onContinue({ pax, contact });
+  } }, "Continue to extras")));
+}
+function ExtrasPage({ offer, onContinue, onBack }) {
+  const [sel, setSel] = useState([]);
+  const toggle = (id) => setSel((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+  const extrasTotal = sel.reduce((sum, id) => sum + EXTRAS_CATALOG.find((e) => e.id === id).price, 0) * offer.passengers;
+  return /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { maxWidth: 700, margin: "0 auto", padding: "10px 18px 90px" } }, /* @__PURE__ */ React.createElement(StepBar, { step: 2 }), /* @__PURE__ */ React.createElement("h1", { className: "disp", style: { fontSize: "clamp(22px,3.5vw,30px)", fontWeight: 700, textAlign: "center", marginBottom: 4 } }, "Make it yours"), /* @__PURE__ */ React.createElement("p", { style: { color: T.muted, fontSize: 14, textAlign: "center", marginBottom: 20 } }, "Prices are per passenger. Skip anything you don't need."), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gap: 10 } }, EXTRAS_CATALOG.map((e) => {
+    const on = sel.includes(e.id);
+    return /* @__PURE__ */ React.createElement(
+      "button",
+      {
+        key: e.id,
+        className: "card",
+        onClick: () => toggle(e.id),
+        "aria-pressed": on,
+        style: { display: "flex", alignItems: "center", gap: 14, padding: 16, textAlign: "left", borderColor: on ? T.gold : T.line }
+      },
+      /* @__PURE__ */ React.createElement("span", { style: { width: 24, height: 24, borderRadius: 8, flexShrink: 0, display: "grid", placeItems: "center", border: `1.5px solid ${on ? T.gold : T.line}`, background: on ? T.gold : "transparent", color: "#1A1206" } }, on && /* @__PURE__ */ React.createElement(I.check, null)),
+      /* @__PURE__ */ React.createElement("span", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("span", { style: { display: "block", fontWeight: 600, fontSize: 15 } }, e.label), /* @__PURE__ */ React.createElement("span", { style: { display: "block", fontSize: 13, color: T.muted } }, e.desc)),
+      /* @__PURE__ */ React.createElement("span", { className: "mono-num", style: { fontWeight: 700, color: on ? T.gold : T.text } }, "+", money(e.price))
+    );
+  })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10, marginTop: 22, alignItems: "center" } }, /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", onClick: onBack }, "Back"), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { flex: 1 }, onClick: () => onContinue(sel) }, extrasTotal > 0 ? `Continue \u2014 extras ${money(extrasTotal)}` : "Continue without extras")));
+}
+function PaymentPage({ offer, extras, onPaid, onBack }) {
+  const [method, setMethod] = useState("card");
+  const [card, setCard] = useState({ number: "", name: "", exp: "", cvc: "" });
+  const [paying, setPaying] = useState(false);
+  const [tried, setTried] = useState(false);
+  const extrasItems = extras.map((id) => EXTRAS_CATALOG.find((e) => e.id === id));
+  const extrasTotal = extrasItems.reduce((s, e) => s + e.price, 0) * offer.passengers;
+  const total = offer.price + extrasTotal + SERVICE_FEE;
+  const numOk = card.number.replace(/\s/g, "").length >= 15;
+  const expOk = /^\d{2}\/\d{2}$/.test(card.exp);
+  const cardOk = method !== "card" || numOk && card.name && expOk && card.cvc.length >= 3;
+  const err = (cond) => tried && !cond ? { borderColor: T.red } : {};
+  const fmtCardNum = (v) => v.replace(/\D/g, "").slice(0, 16).replace(/(\d{4})(?=\d)/g, "$1 ");
+  const pay = async () => {
+    setTried(true);
+    if (!cardOk) return;
+    setPaying(true);
+    const res = await PaymentService.pay({ method, amount: total });
+    setPaying(false);
+    if (res.ok) onPaid({ method, total, txId: res.txId, breakdown: { fare: offer.priceBase, taxes: offer.taxes, carrierFees: offer.carrierFees, extras: extrasTotal, serviceFee: SERVICE_FEE } });
+  };
+  return /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { maxWidth: 700, margin: "0 auto", padding: "10px 18px 90px" } }, /* @__PURE__ */ React.createElement(StepBar, { step: 3 }), /* @__PURE__ */ React.createElement("h1", { className: "disp", style: { fontSize: "clamp(22px,3.5vw,30px)", fontWeight: 700, textAlign: "center", marginBottom: 20 } }, "Payment"), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gap: 10, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", onClick: () => setMethod("apple"), style: { background: method === "apple" ? "#fff" : "#000", color: method === "apple" ? "#000" : "#fff", fontWeight: 600, borderColor: method === "apple" ? T.gold : T.line } }, "Apple Pay"), /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", onClick: () => setMethod("google"), style: { fontWeight: 600, borderColor: method === "google" ? T.gold : T.line, background: method === "google" ? "rgba(255,255,255,0.1)" : "transparent" } }, "Google Pay"), /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", onClick: () => setMethod("card"), style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontWeight: 600, borderColor: method === "card" ? T.gold : T.line, background: method === "card" ? T.goldSoft : "transparent", color: method === "card" ? T.gold : T.text } }, /* @__PURE__ */ React.createElement(I.card, null), " Credit / debit card")), method === "card" && /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 20, marginBottom: 16 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gap: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Card number"), /* @__PURE__ */ React.createElement("input", { style: err(numOk), inputMode: "numeric", value: card.number, onChange: (e) => setCard({ ...card, number: fmtCardNum(e.target.value) }), placeholder: "4242 4242 4242 4242", autoComplete: "cc-number" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Name on card"), /* @__PURE__ */ React.createElement("input", { style: err(card.name), value: card.name, onChange: (e) => setCard({ ...card, name: e.target.value }), autoComplete: "cc-name" })), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 } }, /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "Expiry"), /* @__PURE__ */ React.createElement("input", { style: err(expOk), inputMode: "numeric", value: card.exp, onChange: (e) => {
+    let v = e.target.value.replace(/\D/g, "").slice(0, 4);
+    if (v.length > 2) v = v.slice(0, 2) + "/" + v.slice(2);
+    setCard({ ...card, exp: v });
+  }, placeholder: "MM/YY", autoComplete: "cc-exp" })), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("label", null, "CVC"), /* @__PURE__ */ React.createElement("input", { style: err(card.cvc.length >= 3), inputMode: "numeric", value: card.cvc, onChange: (e) => setCard({ ...card, cvc: e.target.value.replace(/\D/g, "").slice(0, 4) }), placeholder: "123", autoComplete: "cc-csc" })))), /* @__PURE__ */ React.createElement("p", { style: { display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, color: T.faint, marginTop: 14 } }, /* @__PURE__ */ React.createElement(I.shield, null), " Card details are tokenized \u2014 architecture is Stripe-ready, nothing touches our servers.")), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 20, marginBottom: 20 } }, /* @__PURE__ */ React.createElement("h2", { className: "disp", style: { fontSize: 15, fontWeight: 700, color: T.gold, marginBottom: 8 } }, "Total"), /* @__PURE__ */ React.createElement(DetailRow, { k: "Fare", v: money(offer.priceBase) }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Taxes", v: money(offer.taxes) }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Airline fees", v: money(offer.carrierFees) }), extrasItems.map((e) => /* @__PURE__ */ React.createElement(DetailRow, { key: e.id, k: `${e.label} \xD7 ${offer.passengers}`, v: money(e.price * offer.passengers) })), /* @__PURE__ */ React.createElement(DetailRow, { k: "Platform service fee", v: money(SERVICE_FEE) }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Total to pay", v: money(total), accent: true })), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 10 } }, /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", onClick: onBack, disabled: paying }, "Back"), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }, disabled: paying, onClick: pay }, paying ? /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(Spinner, { size: 16 }), " Processing payment\u2026") : `Pay ${money(total)}`)));
+}
+function downloadBlob(name, mime, content) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4e3);
+}
+function itineraryText(order) {
+  const of = order.offer, o = byIata[of.origin], d = byIata[of.destination];
+  return [
+    "FLYNK \u2014 BOOKING CONFIRMATION",
+    "",
+    `Booking reference (PNR): ${order.pnr}`,
+    `Status: CONFIRMED`,
+    "",
+    `Passengers:`,
+    ...order.passengers.pax.map((p, i) => `  ${i + 1}. ${p.first.toUpperCase()} ${p.last.toUpperCase()} \u2014 ${p.nationality}, passport ${p.passport}`),
+    "",
+    `Flight ${of.flightNo} \u2014 ${of.airline.name}`,
+    `${o.city} (${of.origin}) ${of.depTime} \u2192 ${d.city} (${of.destination}) ${of.arrTime}${of.dayShift ? " +" + of.dayShift : ""}`,
+    `Date: ${fmtDate(of.date)}   Duration: ${fmtDur(of.durationMin)}   ${stopsLabel(of)}`,
+    `Aircraft: ${of.aircraft}   Cabin: ${of.cabin}`,
+    `Baggage: ${of.bagsIncluded}`,
+    "",
+    `Total paid: ${money(order.totals.total)} (${order.totals.method})`,
+    `Transaction: ${order.totals.txId}`
+  ].join("\n");
+}
+function icsFile(order) {
+  const of = order.offer;
+  const dt = of.date.replace(/-/g, "");
+  const dep = of.depTime.replace(":", "") + "00";
+  return [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Flynk//EN",
+    "BEGIN:VEVENT",
+    `UID:${order.pnr}@flynk`,
+    `DTSTART:${dt}T${dep}`,
+    `SUMMARY:Flight ${of.flightNo} ${of.origin} \u2192 ${of.destination}`,
+    `DESCRIPTION:PNR ${order.pnr} \xB7 ${of.airline.name} \xB7 ${of.bagsIncluded}`,
+    `LOCATION:${byIata[of.origin].name}`,
+    "END:VEVENT",
+    "END:VCALENDAR"
+  ].join("\r\n");
+}
+function ConfirmationPage({ order, onManage, onNewSearch }) {
+  const of = order.offer, o = byIata[of.origin], d = byIata[of.destination];
+  return /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { maxWidth: 640, margin: "0 auto", padding: "26px 18px 90px", textAlign: "center" } }, /* @__PURE__ */ React.createElement(StepBar, { step: 4 }), /* @__PURE__ */ React.createElement("div", { style: { width: 74, height: 74, margin: "18px auto 14px", borderRadius: "50%", display: "grid", placeItems: "center", background: "rgba(74,222,128,0.12)", border: `1.5px solid ${T.green}`, color: T.green } }, /* @__PURE__ */ React.createElement("svg", { width: "34", height: "34", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.4", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ React.createElement("path", { d: "m4.5 12.5 5 5 10-11" }))), /* @__PURE__ */ React.createElement("h1", { className: "disp", style: { fontSize: "clamp(26px,4.5vw,36px)", fontWeight: 700, letterSpacing: "0.04em" } }, "BOOKING CONFIRMED"), /* @__PURE__ */ React.createElement("p", { style: { color: T.muted, fontSize: 14.5, marginTop: 6 } }, "Your e-ticket is on its way to ", order.passengers.contact.email), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 22, marginTop: 24, textAlign: "left" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { fontSize: 13, color: T.muted } }, "Booking reference"), /* @__PURE__ */ React.createElement("span", { className: "disp mono-num", style: { fontSize: 26, fontWeight: 700, color: T.gold, letterSpacing: "0.12em" } }, order.pnr)), /* @__PURE__ */ React.createElement("div", { style: { borderTop: `1px dashed ${T.line}`, paddingTop: 12 } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginBottom: 12 } }, /* @__PURE__ */ React.createElement(AirlineMark, { airline: of.airline, size: 40 }), /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { fontWeight: 700 } }, o.city, " (", of.origin, ") \u2192 ", d.city, " (", of.destination, ")"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.muted } }, of.airline.name, " ", of.flightNo, " \xB7 ", fmtDate(of.date)))), /* @__PURE__ */ React.createElement(DetailRow, { k: "Departure", v: `${of.depTime} \xB7 Terminal ${of.depTerminal}` }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Arrival", v: `${of.arrTime}${of.dayShift ? " (+" + of.dayShift + "d)" : ""} \xB7 Terminal ${of.arrTerminal}` }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Passengers", v: order.passengers.pax.map((p) => `${p.first} ${p.last}`).join(", ") }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Baggage", v: of.bagsIncluded }), order.extras.length > 0 && /* @__PURE__ */ React.createElement(DetailRow, { k: "Extras", v: order.extras.map((id) => EXTRAS_CATALOG.find((e) => e.id === id).label).join(", ") }), /* @__PURE__ */ React.createElement(DetailRow, { k: "Total paid", v: money(order.totals.total), accent: true }))), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 18 } }, /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }, onClick: () => downloadBlob(`flynk-${order.pnr}.txt`, "text/plain", itineraryText(order)) }, /* @__PURE__ */ React.createElement(I.download, null), " Itinerary"), /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }, onClick: () => downloadBlob(`flynk-${order.pnr}.ics`, "text/calendar", icsFile(order)) }, /* @__PURE__ */ React.createElement(I.cal, null), " Add to calendar"), /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", onClick: onManage }, "Manage booking"), /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", onClick: () => alert(`Confirmation re-sent to ${order.passengers.contact.email}`) }, "Email confirmation")), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", style: { marginTop: 16, width: "100%" }, onClick: onNewSearch }, "Plan the next trip"));
+}
+function TripsPage({ orders, saved, onOpenGlobe }) {
+  return /* @__PURE__ */ React.createElement("div", { className: "fadeup", style: { maxWidth: 700, margin: "0 auto", padding: "26px 18px 90px" } }, /* @__PURE__ */ React.createElement("h1", { className: "disp", style: { fontSize: "clamp(24px,4vw,32px)", fontWeight: 700, marginBottom: 4 } }, "My trips"), /* @__PURE__ */ React.createElement("p", { style: { color: T.muted, fontSize: 14, marginBottom: 22 } }, "Upcoming journeys, past bookings and the places you've starred."), orders.length === 0 ? /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 34, textAlign: "center" } }, /* @__PURE__ */ React.createElement("p", { style: { fontWeight: 600, marginBottom: 6 } }, "Nowhere booked \u2014 yet"), /* @__PURE__ */ React.createElement("p", { style: { color: T.muted, fontSize: 14, marginBottom: 18 } }, "Spin the globe and see where the gold lights take you."), /* @__PURE__ */ React.createElement("button", { className: "btn-primary", onClick: onOpenGlobe }, "Open the globe")) : /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gap: 12 } }, orders.map((ord) => {
+    const of = ord.offer, o = byIata[of.origin], d = byIata[of.destination];
+    return /* @__PURE__ */ React.createElement("div", { key: ord.pnr, className: "card", style: { padding: 18, display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement(AirlineMark, { airline: of.airline }), /* @__PURE__ */ React.createElement("div", { style: { flex: 1, minWidth: 180 } }, /* @__PURE__ */ React.createElement("p", { style: { fontWeight: 700 } }, o.city, " \u2192 ", d.city), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.muted } }, fmtDate(of.date), " \xB7 ", of.airline.name, " ", of.flightNo, " \xB7 ", ord.passengers.pax.length, " pax")), /* @__PURE__ */ React.createElement("div", { style: { textAlign: "right" } }, /* @__PURE__ */ React.createElement("p", { className: "mono-num", style: { color: T.gold, fontWeight: 700, letterSpacing: "0.08em" } }, ord.pnr), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 12, color: T.green } }, "Confirmed")));
+  })), saved.length > 0 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("h2", { className: "disp", style: { fontSize: 17, fontWeight: 700, margin: "28px 0 12px" } }, "Saved destinations"), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } }, saved.map((s) => /* @__PURE__ */ React.createElement("span", { key: s, className: "chip on" }, byIata[s]?.city || s)))), /* @__PURE__ */ React.createElement("div", { className: "card", style: { padding: 18, marginTop: 26, display: "flex", gap: 12, alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { style: { width: 40, height: 40, borderRadius: "50%", display: "grid", placeItems: "center", background: T.goldSoft, color: T.gold } }, /* @__PURE__ */ React.createElement(I.user, null)), /* @__PURE__ */ React.createElement("div", { style: { flex: 1 } }, /* @__PURE__ */ React.createElement("p", { style: { fontWeight: 600, fontSize: 14.5 } }, "Passenger profiles"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.muted } }, "Save traveller details once, book in seconds next time.")), /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", onClick: () => alert("Passenger profiles unlock after your first booking is synced to an account.") }, "Set up")));
+}
+function Nav({ view, mode, go, setMode }) {
+  return /* @__PURE__ */ React.createElement("nav", { style: {
+    position: "sticky",
+    top: 0,
+    zIndex: 90,
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "12px 18px",
+    background: "rgba(5,7,15,0.72)",
+    backdropFilter: "blur(16px)",
+    borderBottom: `1px solid ${T.line}`
+  } }, /* @__PURE__ */ React.createElement("button", { onClick: () => go("home"), className: "disp", style: { display: "flex", alignItems: "center", gap: 9, fontSize: 19, fontWeight: 700, letterSpacing: "0.06em", marginRight: 14 } }, /* @__PURE__ */ React.createElement("span", { style: { color: T.gold } }, /* @__PURE__ */ React.createElement(I.globe, null)), " FLYNK"), /* @__PURE__ */ React.createElement("div", { className: "desktop-only", style: { display: "flex", gap: 2 } }, /* @__PURE__ */ React.createElement("button", { className: `navlink ${view === "home" && mode === "search" ? "active" : ""}`, onClick: () => {
+    go("home");
+    setMode("search");
+  } }, "Flights"), /* @__PURE__ */ React.createElement("button", { className: `navlink ${view === "home" && mode === "explore" ? "active" : ""}`, onClick: () => {
+    go("home");
+    setMode("explore");
+  } }, "Explore"), /* @__PURE__ */ React.createElement("button", { className: `navlink ${view === "trips" ? "active" : ""}`, onClick: () => go("trips") }, "My Trips"), /* @__PURE__ */ React.createElement("button", { className: "navlink", onClick: () => alert("Support is available 24/7 at hello@flynk.travel") }, "Support")), /* @__PURE__ */ React.createElement("div", { style: { marginLeft: "auto", display: "flex", gap: 8 } }, /* @__PURE__ */ React.createElement("button", { className: "mobile-only navlink", onClick: () => go("trips") }, "Trips"), /* @__PURE__ */ React.createElement("button", { className: "btn-ghost", style: { minHeight: 38, padding: "7px 16px", fontSize: 13.5 }, onClick: () => alert("Accounts arrive with the live API \u2014 bookings are kept for this session.") }, "Sign in")));
+}
+function Home({ form, setForm, mode, setMode, explore, setExplore, exploreResults, highlights, onSearch, searching, onPickAirport }) {
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const origin = mode === "explore" ? explore.origin : form.origin;
+  const originAp = origin ? byIata[origin] : null;
+  const panel = (compact) => /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("div", { className: "seg", style: { marginBottom: 14 }, role: "tablist", "aria-label": "Mode" }, /* @__PURE__ */ React.createElement("button", { className: mode === "search" ? "on" : "", onClick: () => setMode("search") }, "Book flights"), /* @__PURE__ */ React.createElement("button", { className: mode === "explore" ? "on" : "", onClick: () => setMode("explore") }, "Explore the world")), mode === "search" ? /* @__PURE__ */ React.createElement(SearchPanel, { form, setForm, onSearch, searching, compact }) : /* @__PURE__ */ React.createElement(
+    ExplorePanel,
+    {
+      explore,
+      setExplore,
+      results: exploreResults,
+      origin: explore.origin,
+      onPickDest: (iata) => {
+        setForm((f) => ({ ...f, origin: explore.origin, destination: iata }));
+        setMode("search");
+      }
+    }
+  ));
+  return /* @__PURE__ */ React.createElement("div", { style: { position: "relative", height: "calc(100dvh - 63px)", overflow: "hidden" } }, /* @__PURE__ */ React.createElement(
+    Globe,
+    {
+      originIata: origin || null,
+      destIata: mode === "search" ? form.destination || null : null,
+      highlights,
+      onPickAirport,
+      style: { position: "absolute", inset: 0 }
+    }
+  ), /* @__PURE__ */ React.createElement("div", { style: { position: "absolute", top: "clamp(14px, 4vh, 44px)", left: 0, right: 0, textAlign: "center", pointerEvents: "none", padding: "0 16px" } }, /* @__PURE__ */ React.createElement("p", { className: "disp fadeup", style: { fontSize: 12.5, letterSpacing: "0.34em", color: T.gold, marginBottom: 8 } }, "SPIN \xB7 TAP \xB7 FLY"), /* @__PURE__ */ React.createElement("h1", { className: "disp fadeup", style: { fontSize: "clamp(26px, 5vw, 52px)", fontWeight: 700, lineHeight: 1.06, animationDelay: "80ms" } }, "The world, one tap away"), /* @__PURE__ */ React.createElement("p", { className: "fadeup", style: { color: T.muted, fontSize: "clamp(13px, 1.6vw, 15.5px)", marginTop: 8, animationDelay: "160ms" } }, originAp ? `Live fares from ${originAp.city} \u2014 tap a glowing city to lock it in` : "Tap any glowing airport on the globe to set your origin")), /* @__PURE__ */ React.createElement("div", { className: "desktop-only glass fadeup", style: { position: "absolute", left: 26, top: "50%", transform: "translateY(-44%)", width: 396, maxHeight: "78%", overflowY: "auto", padding: 22, animationDelay: "220ms" } }, panel(false)), /* @__PURE__ */ React.createElement("div", { className: "mobile-only glass", style: { position: "absolute", left: 10, right: 10, bottom: 10, maxHeight: sheetOpen ? "76%" : 132, overflow: "hidden", transition: "max-height .35s cubic-bezier(.2,.7,.2,1)", display: "flex", flexDirection: "column" } }, /* @__PURE__ */ React.createElement(
+    "button",
+    {
+      "aria-expanded": sheetOpen,
+      "aria-label": sheetOpen ? "Collapse search" : "Expand search",
+      onClick: () => setSheetOpen(!sheetOpen),
+      style: { padding: "10px 0 6px", display: "grid", placeItems: "center", flexShrink: 0 }
+    },
+    /* @__PURE__ */ React.createElement("span", { style: { width: 42, height: 4.5, borderRadius: 3, background: "rgba(255,255,255,0.28)" } })
+  ), /* @__PURE__ */ React.createElement("div", { style: { padding: "0 16px 16px", overflowY: "auto" }, className: "hide-scroll" }, !sheetOpen ? /* @__PURE__ */ React.createElement("button", { style: { width: "100%", textAlign: "left" }, onClick: () => setSheetOpen(true) }, /* @__PURE__ */ React.createElement("p", { style: { fontWeight: 700, fontSize: 15.5 } }, form.origin ? byIata[form.origin].city : "Where from?", /* @__PURE__ */ React.createElement("span", { style: { color: T.faint, margin: "0 8px" } }, "\u2192"), form.destination ? byIata[form.destination].city : "Anywhere"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: 13, color: T.muted, marginTop: 3 } }, form.depart ? fmtDate(form.depart) : "Pick dates", " \xB7 ", form.pax, " pax \xB7 tap to edit")) : panel(true))));
+}
+function App() {
+  const [view, setView] = useState("home");
+  const [mode, setMode] = useState("search");
+  const [form, setForm] = useState({ origin: "", destination: "", depart: toISODate(addDays(/* @__PURE__ */ new Date(), 14)), ret: toISODate(addDays(/* @__PURE__ */ new Date(), 21)), trip: "round", pax: 1, cabin: "economy" });
+  const [explore, setExplore] = useState({ origin: "", maxBudget: null, maxDurationH: null, directOnly: false, tags: [] });
+  const [exploreResults, setExploreResults] = useState([]);
+  const [homeSuggestions, setHomeSuggestions] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [selectedOffer, setSelectedOffer] = useState(null);
+  const [paxData, setPaxData] = useState(null);
+  const [extras, setExtras] = useState([]);
+  const [order, setOrder] = useState(null);
+  const [orders, setOrders] = useState([]);
+  const [saved] = useState([]);
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.textContent = CSS;
+    document.head.appendChild(style);
+    return () => style.remove();
+  }, []);
+  useEffect(() => {
+    let live = true;
+    if (mode === "explore" && explore.origin) {
+      FlightSearchService.explore(explore).then((r) => live && setExploreResults(r));
+    } else setExploreResults([]);
+    return () => {
+      live = false;
+    };
+  }, [mode, explore]);
+  useEffect(() => {
+    let live = true;
+    if (mode === "search" && form.origin) {
+      FlightSearchService.explore({ origin: form.origin }).then((r) => live && setHomeSuggestions(r));
+    } else setHomeSuggestions([]);
+    return () => {
+      live = false;
+    };
+  }, [mode, form.origin]);
+  const highlights = useMemo(() => {
+    const src = mode === "explore" ? exploreResults : homeSuggestions;
+    return src.slice(0, 14).map((r) => ({ iata: r.airport.iata, price: r.price }));
+  }, [mode, exploreResults, homeSuggestions]);
+  const runSearch = useCallback(async (f = form) => {
+    if (!f.origin || !f.destination || !f.depart) return;
+    setSearching(true);
+    setView("results");
+    setOffers([]);
+    const res = await FlightSearchService.search({ origin: f.origin, destination: f.destination, date: f.depart, cabin: f.cabin, passengers: f.pax });
+    setOffers(res);
+    setSearching(false);
+  }, [form]);
+  const onPickAirport = useCallback((iata) => {
+    if (mode === "explore") {
+      if (!explore.origin) {
+        setExplore((e) => ({ ...e, origin: iata }));
+        return;
+      }
+      if (iata === explore.origin) {
+        setExplore((e) => ({ ...e, origin: "" }));
+        return;
+      }
+      setForm((f) => ({ ...f, origin: explore.origin, destination: iata }));
+      setMode("search");
+      return;
+    }
+    setForm((f) => {
+      if (!f.origin) return { ...f, origin: iata };
+      if (iata === f.origin) return { ...f, origin: "", destination: "" };
+      return { ...f, destination: iata };
+    });
+  }, [mode, explore.origin]);
+  const go = (v) => setView(v);
+  return /* @__PURE__ */ React.createElement("div", { style: { minHeight: "100dvh", background: `radial-gradient(1200px 700px at 70% -10%, #0D1730 0%, ${T.bg} 55%)` } }, /* @__PURE__ */ React.createElement(Nav, { view, mode, go, setMode }), view === "home" && /* @__PURE__ */ React.createElement(
+    Home,
+    {
+      form,
+      setForm,
+      mode,
+      setMode,
+      explore,
+      setExplore,
+      exploreResults,
+      highlights,
+      onSearch: () => runSearch(),
+      searching,
+      onPickAirport
+    }
+  ), view === "results" && /* @__PURE__ */ React.createElement(
+    ResultsPage,
+    {
+      query: form,
+      offers,
+      loading: searching,
+      onSelect: (of) => {
+        setSelectedOffer(of);
+        setView("details");
+      },
+      onBack: () => setView("home")
+    }
+  ), view === "details" && selectedOffer && /* @__PURE__ */ React.createElement(
+    FlightDetails,
+    {
+      offer: selectedOffer,
+      query: form,
+      onContinue: () => setView("passengers"),
+      onBack: () => setView("results")
+    }
+  ), view === "passengers" && selectedOffer && /* @__PURE__ */ React.createElement(
+    PassengersPage,
+    {
+      offer: selectedOffer,
+      count: form.pax,
+      onContinue: (d) => {
+        setPaxData(d);
+        setView("extras");
+      },
+      onBack: () => setView("details")
+    }
+  ), view === "extras" && selectedOffer && /* @__PURE__ */ React.createElement(
+    ExtrasPage,
+    {
+      offer: selectedOffer,
+      onContinue: (sel) => {
+        setExtras(sel);
+        setView("payment");
+      },
+      onBack: () => setView("passengers")
+    }
+  ), view === "payment" && selectedOffer && /* @__PURE__ */ React.createElement(
+    PaymentPage,
+    {
+      offer: selectedOffer,
+      extras,
+      onBack: () => setView("extras"),
+      onPaid: async (totals) => {
+        const ord = await BookingService.create(selectedOffer, paxData, extras, totals);
+        setOrder(ord);
+        setOrders(BookingService.list().slice());
+        setView("confirmation");
+      }
+    }
+  ), view === "confirmation" && order && /* @__PURE__ */ React.createElement(
+    ConfirmationPage,
+    {
+      order,
+      onManage: () => setView("trips"),
+      onNewSearch: () => {
+        setForm((f) => ({ ...f, destination: "" }));
+        setView("home");
+      }
+    }
+  ), view === "trips" && /* @__PURE__ */ React.createElement(TripsPage, { orders, saved, onOpenGlobe: () => setView("home") }));
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+
+</script>
+</body>
+</html>
